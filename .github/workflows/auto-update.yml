@@ -1,0 +1,84 @@
+name: Auto-Update
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Every Sunday at midnight UTC
+  workflow_dispatch:
+
+env:
+  VERSION_FILE: version.txt
+  SETUP_FILE: setup.py
+  PYPROJECT: pyrproject.toml
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout your fork
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          
+      - name: Read version number
+        id: version
+        run: |
+          CURRENT_VERSION=$(grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' "$VERSION_FILE" | head -n 1)
+          IFS='.' read -r  MAJOR MINOR PATCH <<< $CURRENT_VERSION
+          PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "major=$MAJOR" >> $GITHUB_OUTPUT
+          echo "minor=$MINOR" >> $GITHUB_OUTPUT
+
+      - name: Add upstream repo
+        run: |
+          git remote add upstream https://github.com/aerkalov/ebooklib
+          git fetch upstream
+          git merge upstream/main --no-edit
+
+      - name: Auto-increment version
+        id: increment_version
+        run: |
+          UPSTREAM_VERSION=$(grep -Eo '[0-9]+\.[0-9]+' "$VERSION_FILE" | head -n 1)
+          IFS='.' read -r UP_MAJOR UP_MINOR <<< $UPSTREAM_VERSION
+          if [ -n "$(git status --porcelain)" ]; then
+            if [[ UP_MAJOR == ${{ steps.version.outputs.major }} && UP_MINOR == ${{ steps.version.outputs.minor}} ]]; then
+              UPDATED_VERSION = ${{ steps.version.outputs.new_version }}
+            else
+              UPDATED_VERSION = "$UP_MAJOR.$UP_MINOR.0"
+            fi
+            sed -i "0,/$UPSTREAM_VERSION/s//$UPDATED_VERSION/" $VERSION_FILE $SETUP_FILE $PYPROJECT
+            git add $VERSION_FILE $SETUP_FILE $PYPROJECT
+            git commit -m "Auto-increment version to ${{ steps.version.outputs.new_version }}"
+          fi
+
+      - name: Update Python versions in setup file
+        run: |
+          python <<EOF
+          import re
+          supported_versions = ["3.6", "3.7", "3.8". "3.9", "3.10", "3.11", "3.12", "3.13"]
+          new_versions = [
+            f'         "Programming Language :: Python :: {version}"'
+            for version in supported versions
+          ]
+          setup_file = $SETUP_FILE
+          with open(setup_file, "r") as f:
+            original_text = f.read()
+          pattern = r'^\s*Programming Language :: Python :: [^\n]*(?:\n\s*Programming Language :: Python :: [^\n]*)*'
+          updated_text = re.sub(pattern, new_versions, original_text, flags=re.MULTILINE)
+          if updated_text == original_text:
+            exit(0)
+          with open(setup_file, "w") as f:
+            f.write(updated_text)
+          EOF
+          if [ -n "$(git status --porcelain)" ]; then
+            git add $SETUP_FILE
+            git commit -m "Update supported Python versions"
+          fi
+            
+      - name: Push changes to fork
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git push origin main
