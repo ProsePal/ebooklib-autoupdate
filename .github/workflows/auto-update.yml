@@ -39,6 +39,8 @@ jobs:
         run: |
           git remote add upstream https://github.com/aerkalov/ebooklib
           git fetch upstream
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git merge upstream/master --allow-unrelated-histories --no-edit
 
       - name: Auto-increment version
@@ -82,7 +84,4 @@ jobs:
           fi
             
       - name: Push changes to fork
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git push origin main
+        run: git push origin main
