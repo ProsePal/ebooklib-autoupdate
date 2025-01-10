@@ -63,16 +63,19 @@ jobs:
         run: |
           python <<EOF
           import re
-          supported_versions = ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
-          new_versions = [
-            f'         "Programming Language :: Python :: {version}"'
-            for version in supported versions
-          ]
-          setup_file = ${{ env.SETUP_FILE }}
+          supported_versions = ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+          setup_file = "${{ env.SETUP_FILE }}"
           with open(setup_file, "r") as f:
             original_text = f.read()
-          pattern = r'^\s*Programming Language :: Python :: [^\n]*(?:\n\s*Programming Language :: Python :: [^\n]*)*'
-          updated_text = re.sub(pattern, new_versions, original_text, flags=re.MULTILINE)
+          old_version_nums = [version[4:].strip() for version in re.findall("Programming Language :: Python :: [^\n]", original_text]
+          if old_version_nums == supported_versions:
+            exit(0)
+          old_versions = r'^\s*Programming Language :: Python :: [^\n]*(?:\n\s*Programming Language :: Python :: [^\n]*)*'
+          new_versions = [
+            f'         "Programming Language :: Python :: {version}"'
+            for version in supported_versions
+          ]
+          updated_text = re.sub(old_versions, new_versions, original_text, flags=re.MULTILINE)
           if updated_text == original_text:
             exit(0)
           with open(setup_file, "w") as f:
