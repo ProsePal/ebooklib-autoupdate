@@ -63,7 +63,7 @@ jobs:
         run: |
           python <<EOF
           import re
-          supported_versions = ["3.6", "3.7", "3.8". "3.9", "3.10", "3.11", "3.12", "3.13"]
+          supported_versions = ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
           new_versions = [
             f'         "Programming Language :: Python :: {version}"'
             for version in supported versions
