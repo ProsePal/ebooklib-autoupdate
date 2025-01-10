@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 env:
-  VERSION_FILE: version.txt
+  VERSION_FILE: VERSION.txt
   SETUP_FILE: setup.py
   PYPROJECT: pyrproject.toml
 
