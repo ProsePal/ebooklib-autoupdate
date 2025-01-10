@@ -67,14 +67,16 @@ jobs:
           setup_file = "${{ env.SETUP_FILE }}"
           with open(setup_file, "r") as f:
             original_text = f.read()
-          old_version_nums = [version[4:].strip() for version in re.findall("Programming Language :: Python :: [^\n]", original_text]
+          programming_line_stub = '"Programming Language :: Python :: '
+          programming_line = f'{programming_line_stub}[0-9.]+"'
+          old_version_nums = [version[4:].strip() for version in re.findall(programming_line, original_text)]
           if old_version_nums == supported_versions:
             exit(0)
-          old_versions = r'^\s*Programming Language :: Python :: [^\n]*(?:\n\s*Programming Language :: Python :: [^\n]*)*'
-          new_versions = [
-            f'         "Programming Language :: Python :: {version}"'
+          old_versions = rf'^\s*{programming_line}*(?:\n\s*{programming_line}*)*'
+          new_versions = "\n|.join(
+            f'         {programming_line_stub}{version}"'
             for version in supported_versions
-          ]
+          )
           updated_text = re.sub(old_versions, new_versions, original_text, flags=re.MULTILINE)
           if updated_text == original_text:
             exit(0)
