@@ -73,7 +73,7 @@ jobs:
           if old_version_nums == supported_versions:
             exit(0)
           old_versions = rf'^\s*{programming_line}*(?:\n\s*{programming_line}*)*'
-          new_versions = "\n|.join(
+          new_versions = "\n".join(
             f'         {programming_line_stub}{version}"'
             for version in supported_versions
           )
