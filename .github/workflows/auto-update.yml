@@ -32,11 +32,11 @@ jobs:
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
       - name: Add GitHub Action Bot
-         run: |
-           git config --global user.name "github-actions[bot]"
-           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-       - name: Check if upstream has changes
+      - name: Check if upstream has changes
         id: upstream_changes
         run: |
           VERSION_TIMESTAMP=$(git log -1 --format=%at -- ${{ env.VERSION_FILE }})
@@ -75,13 +75,13 @@ jobs:
           if [[ $UPSTREAM_MAJOR == $CURRENT_MAJOR && $UPSTREAM_MINOR == $CURRENT_MINOR ]]; then
             PATCH=$(($PATCH + 1))
             UPDATED_VERSION="$CURRENT_MAJOR.$CURRENT_MINOR.$PATCH"
-            else
-              UPDATED_VERSION="$UPSTREAM_MAJOR.$UPSTREAM_MINOR.0"
-            fi
-            sed -i "0,/$UPSTREAM_VERSION/s//$UPDATED_VERSION/" ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }}
-            sed -i "0,/$CURRENT_VERSION/s//$UPDATED_VERSION" ${{ env.PYPROJECT_FILE }}
-            git add ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }} ${{ env.PYPROJECT_FILE }}
-            git commit -m "Auto-increment version to $UPDATED_VERSION"
+          else
+            UPDATED_VERSION="$UPSTREAM_MAJOR.$UPSTREAM_MINOR.0"
+          fi
+          sed -i "0,/$UPSTREAM_VERSION/s//$UPDATED_VERSION/" ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }}
+          sed -i "0,/$CURRENT_VERSION/s//$UPDATED_VERSION" ${{ env.PYPROJECT_FILE }}
+          git add ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }} ${{ env.PYPROJECT_FILE }}
+          git commit -m "Auto-increment version to $UPDATED_VERSION"
 
       - name: Update supported Python versions in setup.py
         if: steps.upstream_changes.outputs.update_setup == 'true'
@@ -118,7 +118,7 @@ jobs:
       - name: Sync new branches
         run: |
           NEW_BRANCHES=$(git branch -r | grep "upstream/" | grep -v -f <(git branch -r | grep "origin/" | sed 's/origin/upstream/') | grep -v "HEAD" | sed 's/upstream\///')
-         for BRANCH in $NEW_BRANCHES; do
-           git checkout -b "$BRANCH" "upstream/$BRANCH"
-           git push -u origin "$BRANCH"
-         done
+          for BRANCH in $NEW_BRANCHES; do
+            git checkout -b "$BRANCH" "upstream/$BRANCH"
+            git push -u origin "$BRANCH"
+          done
