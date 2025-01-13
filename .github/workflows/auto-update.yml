@@ -22,7 +22,7 @@ jobs:
 
       - name: Add upstream repo
         run: |
-          git remote add upstream https://github.com/aerkalov/ebooklib
+          git remote add upstream https://github.com/aerkalov/ebooklib || echo "Upstream already added"
           git fetch upstream
 
       - name: Read fork version and setup hash
@@ -32,11 +32,11 @@ jobs:
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
       - name: Add GitHub Action Bot
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+         run: |
+           git config --global user.name "github-actions[bot]"
+           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Check if upstream has changes
+       - name: Check if upstream has changes
         id: upstream_changes
         run: |
           VERSION_TIMESTAMP=$(git log -1 --format=%at -- ${{ env.VERSION_FILE }})
@@ -75,13 +75,13 @@ jobs:
           if [[ $UPSTREAM_MAJOR == $CURRENT_MAJOR && $UPSTREAM_MINOR == $CURRENT_MINOR ]]; then
             PATCH=$(($PATCH + 1))
             UPDATED_VERSION="$CURRENT_MAJOR.$CURRENT_MINOR.$PATCH"
-          else
-            UPDATED_VERSION="$UPSTREAM_MAJOR.$UPSTREAM_MINOR.0"
-          fi
-          sed -i "0,/$UPSTREAM_VERSION/s//$UPDATED_VERSION/" ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }}
-          sed -i "0,/$CURRENT_VERSION/s//$UPDATED_VERSION" ${{ env.PYPROJECT_FILE }}
-          git add ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }} ${{ env.PYPROJECT_FILE }}
-          git commit -m "Auto-increment version to $UPDATED_VERSION"
+            else
+              UPDATED_VERSION="$UPSTREAM_MAJOR.$UPSTREAM_MINOR.0"
+            fi
+            sed -i "0,/$UPSTREAM_VERSION/s//$UPDATED_VERSION/" ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }}
+            sed -i "0,/$CURRENT_VERSION/s//$UPDATED_VERSION" ${{ env.PYPROJECT_FILE }}
+            git add ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }} ${{ env.PYPROJECT_FILE }}
+            git commit -m "Auto-increment version to $UPDATED_VERSION"
 
       - name: Update supported Python versions in setup.py
         if: steps.upstream_changes.outputs.update_setup == 'true'
@@ -91,26 +91,25 @@ jobs:
           supported_versions = ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
           setup_file = "${{ env.SETUP_FILE }}"
           with open(setup_file, "r") as f:
-              original_text = f.read()
+            original_text = f.read()
+          text = re.sub("and kindle ", "", original_text)
+          allowed_keywords = r"Keywords = ['ebook', 'epub']"
+          keyword_pattern = r"Keywords = [(?:'\w+',\s?)*'\w+']"
+          corrected_text = re.sub(keyword_pattern, allowed_keywords, text)
           programming_line_stub = '"Programming Language :: Python :: '
-          programming_line = f'{programming_line_stub}[0-9.]+"'
-          existing_versions = sorted(version[4:].strip() for version in re.findall(programming_line, original_text))
-          if existing_versions == supported_versions:
-              exit(0)
-          old_versions = rf'^\s*{programming_line}*(?:\n,\s*{programming_line})'
+          programming_line = f'{programming_line_stub}[0-9.]+,"'
+          existing_versions = sorted(version[4:].strip() for version in re.findall(programming_line, corrected_text))
+          old_versions = rf'^\s*{programming_line}*(?:\n\s*{programming_line})*'
           new_versions = "\n".join(
             f'         {programming_line_stub}{version},"'
             for version in supported_versions
           )
-          updated_text = re.sub(old_versions, new_versions.rstrip(","), original_text, flags=re.MULTILINE)
-          if updated_text != original_text:
-              with open(setup_file, "w") as f:
-                  f.write(updated_text)
+          updated_text = re.sub(old_versions, new_versions, corrected_text, flags=re.MULTILINE)
+          with open(setup_file, "w") as f:
+            f.write(updated_text)
           EOF
-          if [ -n "$(git status --porcelain)" ]; then
-            git add ${{ env.SETUP_FILE }}
-            git commit -m "Update supported Python versions"
-          fi
+          git add ${{ env.SETUP_FILE }}
+          git commit -m "Update supported Python versions"
 
       - name: Push changes to fork
         if: steps.upstream_changes.outputs.merge_needed == 'true'
@@ -119,7 +118,7 @@ jobs:
       - name: Sync new branches
         run: |
           NEW_BRANCHES=$(git branch -r | grep "upstream/" | grep -v -f <(git branch -r | grep "origin/" | sed 's/origin/upstream/') | grep -v "HEAD" | sed 's/upstream\///')
-          for BRANCH in $NEW_BRANCHES; do
-            git checkout -b "$BRANCH" "upstream/$BRANCH"
-            git push -u origin "$BRANCH"
-          done
+         for BRANCH in $NEW_BRANCHES; do
+           git checkout -b "$BRANCH" "upstream/$BRANCH"
+           git push -u origin "$BRANCH"
+         done
