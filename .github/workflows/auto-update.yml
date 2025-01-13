@@ -117,7 +117,9 @@ jobs:
 
       - name: Sync new branches
         run: |
-          NEW_BRANCHES=$(git branch -r | grep "upstream/" | grep -v -f <(git branch -r | grep "origin/" | sed 's/origin/upstream/') | grep -v "HEAD" | sed 's/upstream\///')
+          NEW_BRANCHES=$(comm -23 \
+            <(git branch -r | grep "upstream/" | grep -v "HEAD" | sed 's/  upstream\///' | sort) \
+            <(git branch -r | grep "origin/" | sed 's/  origin\///' | sort))
           for BRANCH in $NEW_BRANCHES; do
             git checkout -b "$BRANCH" "upstream/$BRANCH"
             git push -u origin "$BRANCH"
