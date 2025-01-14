@@ -1,4 +1,4 @@
-# EbookLib-Py
+# EbookLib-autoupdate
 
 This is a fork of the popular Ebooklib library that aims to keep a package updated with changes from the original codebase. Any changes to [https://github.com/aerkalov/ebooklib] are merged into this package on a weekly basis.
 

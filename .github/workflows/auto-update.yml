@@ -123,7 +123,7 @@ jobs:
       - name: Update README
         if: steps.upstream_changes.outputs.update_readme == 'true'
         run: |
-          sed -i '1i # EbookLib-Py\n\n' "${{ env.README_FILE }}"
+          sed -i '1i # EbookLib-autoupdate\n\n' "${{ env.README_FILE }}"
           sed -i '2i This is a fork of the popular Ebooklib library that aims to keep a package updated with changes from the original codebase. Any changes to [https://github.com/aerkalov/ebooklib] are merged into this package on a weekly basis.\n' "${{ env.README_FILE }}"
           git add ${{ env.README_FILE }}
           git commit -m "Update README"
