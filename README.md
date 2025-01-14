@@ -1,6 +1,10 @@
+# EbookLib-Py
+
+This is a fork of the popular Ebooklib library that aims to keep a package updated with changes from the original codebase. Any changes to [https://github.com/aerkalov/ebooklib] are merged into this package on a weekly basis.
+
 # About EbookLib
 
-EbookLib is a Python library for managing EPUB2/EPUB3 and Kindle files. It's capable of reading and writing EPUB files programmatically.
+EbookLib is a Python library for managing EPUB2/EPUB3 files. It's capable of reading and writing EPUB files programmatically.
 
 We are working on [refreshing the project](https://github.com/aerkalov/ebooklib/issues/318) so please check and comment if you have your own ideas what needs to happen with the project.
 
@@ -8,13 +12,14 @@ The API is designed to be as simple as possible, while at the same time making c
 
 EbookLib is used in [Booktype](https://github.com/sourcefabric/Booktype/) from Sourcefabric, as well as [sprits-it!](https://github.com/the-happy-hippo/sprits-it), [fanfiction2ebook](https://github.com/ltouroumov/fanfiction2ebook), [viserlalune](https://github.com/vjousse/viserlalune) and [Telemeta](https://github.com/Parisson/Telemeta).
 
-Packages of EbookLib for GNU/Linux are available in [Debian](https://packages.debian.org/python-ebooklib) and [Ubuntu](http://packages.ubuntu.com/python-ebooklib). 
+Packages of EbookLib for GNU/Linux are available in [Debian](https://packages.debian.org/python-ebooklib) and [Ubuntu](http://packages.ubuntu.com/python-ebooklib).
 
-Sphinx documentation is generated from the templates in the docs/ directory and made available at http://ebooklib.readthedocs.io
+Sphinx documentation is generated from the templates in the docs/ directory and made available at <http://ebooklib.readthedocs.io>
 
 # Usage
 
 ## Reading
+
 ```py
 import ebooklib
 from ebooklib import epub
@@ -25,8 +30,8 @@ for image in book.get_items_of_type(ebooklib.ITEM_IMAGE):
     print(image)
 ```
 
-
 ## Writing
+
 ```py
 from ebooklib import epub
 
@@ -96,10 +101,10 @@ book.spine = ["nav", c1]
 epub.write_epub("test.epub", book, {})
 ```
 
-
 # License
+
 EbookLib is licensed under the [AGPL license](LICENSE.txt).
 
-
 # Authors
+
 Full list of authors is in [AUTHORS.txt](AUTHORS.txt) file.

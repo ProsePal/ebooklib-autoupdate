@@ -13,6 +13,7 @@ env:
   VERSION_FILE: VERSION.txt
   SETUP_FILE: setup.py
   PYPROJECT_FILE: pyproject.toml
+  README_FILE: README.md
 
 jobs:
   update:
@@ -26,7 +27,7 @@ jobs:
           git remote add upstream https://github.com/aerkalov/ebooklib || echo "Upstream already added"
           git fetch upstream
 
-      - name: Read fork version and setup hash
+      - name: Read fork version
         id: fork_state
         run: |
           CURRENT_VERSION=$(grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' "${{ env.VERSION_FILE }}")
@@ -42,6 +43,7 @@ jobs:
         run: |
           VERSION_TIMESTAMP=$(git log -1 --format=%at -- ${{ env.VERSION_FILE }})
           UPSTREAM_SETUP_TIMESTAMP=$(git log upstream/master -1 --format=%at -- ${{ env.SETUP_FILE }})
+          UPSTREAM_README_TIMESTAMP=$(git log upstream/master -1 --format=%at -- ${{ env.README_FILE }})
           if [[ $(git log upstream/master -1 --format=%at) -gt $VERSION_TIMESTAMP ]]; then
             echo "updated_version=true" >> $GITHUB_OUTPUT
           else
@@ -51,6 +53,11 @@ jobs:
             echo "update_setup=true" >> $GITHUB_OUTPUT
           else
             echo "update_setup=false" >> $GITHUB_OUTPUT
+          fi
+          if [[ $UPSTREAM_README_TIMESTAMP -gt $VERSION_TIMESTAMP ]]; then
+            echo "update_readme=true" >> $GITHUB_OUTPUT
+          else
+            echo "update_readme=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Merge upstream changes
@@ -112,6 +119,14 @@ jobs:
           EOF
           git add ${{ env.SETUP_FILE }}
           git commit -m "Update supported Python versions"
+
+      - name: Update README
+        if: steps.upstream_changes.outputs.update_readme == 'true'
+        run: |
+          sed -i '1i # EbookLib-Py\n\n' "${{ env.README_FILE }}"
+          sed -i '2i This is a fork of the popular Ebooklib library that aims to keep a package updated with changes from the original codebase. Any changes to [https://github.com/aerkalov/ebooklib] are merged into this package on a weekly basis.\n' "${{ env.README_FILE }}"
+          git add ${{ env.README_FILE }}
+          git commit -m "Update README"
 
       - name: Push changes to fork
         if: steps.upstream_changes.outputs.updated_version == 'true'
