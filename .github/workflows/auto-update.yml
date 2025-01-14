@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 env:
   VERSION_FILE: VERSION.txt
@@ -14,7 +15,7 @@ env:
   PYPROJECT_FILE: pyproject.toml
 
 jobs:
-  sync:
+  update:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -42,9 +43,9 @@ jobs:
           VERSION_TIMESTAMP=$(git log -1 --format=%at -- ${{ env.VERSION_FILE }})
           UPSTREAM_SETUP_TIMESTAMP=$(git log upstream/master -1 --format=%at -- ${{ env.SETUP_FILE }})
           if [[ $(git log upstream/master -1 --format=%at) -gt $VERSION_TIMESTAMP ]]; then
-            echo "merge_needed=true" >> $GITHUB_OUTPUT
+            echo "updated_version=true" >> $GITHUB_OUTPUT
           else
-            echo "merge_needed=false" >> $GITHUB_OUTPUT
+            echo "updated_version=false" >> $GITHUB_OUTPUT
           fi
           if [[ $UPSTREAM_SETUP_TIMESTAMP -gt $VERSION_TIMESTAMP ]]; then
             echo "update_setup=true" >> $GITHUB_OUTPUT
@@ -53,7 +54,7 @@ jobs:
           fi
 
       - name: Merge upstream changes
-        if: steps.upstream_changes.outputs.merge_needed == 'true'
+        if: steps.upstream_changes.outputs.updated_version == 'true'
         run: |
           {
             echo "${{ env.VERSION_FILE }} merge=theirs"
@@ -66,22 +67,23 @@ jobs:
           git merge upstream/master --no-edit
 
       - name: Increment version
-        if: steps.upstream_changes.outputs.merge_needed == 'true'
+        id: version
+        if: steps.upstream_changes.outputs.updated_version == 'true'
         run: |
           UPSTREAM_VERSION=$(grep -Eo '[0-9]+\.[0-9]+' "${{ env.VERSION_FILE }}")
-          IFS='.' read -r UPSTREAM_MAJOR UPSTREAM._MINOR <<< "$UPSTREAM_VERSION"
+          IFS='.' read -r UPSTREAM_MAJOR UPSTREAM_MINOR <<< "$UPSTREAM_VERSION"
           CURRENT_VERSION="${{ steps.fork_state.outputs.current_version }}"
           IFS='.' read -r CURRENT_MAJOR CURRENT_MINOR PATCH <<< "$CURRENT_VERSION"
           if [[ $UPSTREAM_MAJOR == $CURRENT_MAJOR && $UPSTREAM_MINOR == $CURRENT_MINOR ]]; then
             PATCH=$(($PATCH + 1))
-            UPDATED_VERSION="$CURRENT_MAJOR.$CURRENT_MINOR.$PATCH"
+            NEW_VERSION="$CURRENT_MAJOR.$CURRENT_MINOR.$PATCH"
           else
-            UPDATED_VERSION="$UPSTREAM_MAJOR.$UPSTREAM_MINOR.0"
+            NEW_VERSION="$UPSTREAM_MAJOR.$UPSTREAM_MINOR.0"
           fi
-          sed -i "0,/$UPSTREAM_VERSION/s//$UPDATED_VERSION/" ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }}
-          sed -i "0,/$CURRENT_VERSION/s//$UPDATED_VERSION" ${{ env.PYPROJECT_FILE }}
+          sed -i "0,/$UPSTREAM_VERSION/s//$NEW_VERSION/" ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }}
+          sed -i "0,/$CURRENT_VERSION/s//$NEW_VERSION" ${{ env.PYPROJECT_FILE }}
           git add ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }} ${{ env.PYPROJECT_FILE }}
-          git commit -m "Auto-increment version to $UPDATED_VERSION"
+          git commit -m "Auto-increment version to $NEW_VERSION"
 
       - name: Update supported Python versions in setup.py
         if: steps.upstream_changes.outputs.update_setup == 'true'
@@ -104,23 +106,41 @@ jobs:
             f'         {programming_line_stub}{version},"'
             for version in supported_versions
           )
-          updated_text = re.sub(old_versions, new_versions, corrected_text, flags=re.MULTILINE)
+          new_version_text = re.sub(old_versions, new_versions, corrected_text, flags=re.MULTILINE)
           with open(setup_file, "w") as f:
-            f.write(updated_text)
+            f.write(new_version_text)
           EOF
           git add ${{ env.SETUP_FILE }}
           git commit -m "Update supported Python versions"
 
       - name: Push changes to fork
-        if: steps.upstream_changes.outputs.merge_needed == 'true'
+        if: steps.upstream_changes.outputs.updated_version == 'true'
         run: git push origin master
+
+      - name: Install uv
+        if: steps.upstream_changes.outputs.updated_version == 'true'
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Build and publish
+        if: steps.upstream_changes.outputs.updated_version == 'true'
+        run: |
+          uv build
+          uv publish
 
       - name: Sync new branches
         run: |
-          NEW_BRANCHES=$(comm -23 \
-            <(git branch -r | grep "upstream/" | grep -v "HEAD" | sed 's/  upstream\///' | sort) \
-            <(git branch -r | grep "origin/" | sed 's/  origin\///' | sort))
-          for BRANCH in $NEW_BRANCHES; do
-            git checkout -b "$BRANCH" "upstream/$BRANCH"
-            git push -u origin "$BRANCH"
+          git fetch --all
+          for BRANCH in $(git branch -r | grep "upstream/" | grep -v "HEAD" | sed 's/upstream\///'); do
+            if [ "$BRANCH" == "master" ]; then
+              continue
+            fi
+            if ! git show-ref --verify --quiet "refs/heads/$BRANCH"; then
+              git branch "$BRANCH" "upstream/$BRANCH"
+            else
+              git checkout "$BRANCH"
+              git merge -s recursive -X theirs "upstream/$BRANCH" --no-edit
+            fi
+            git push -f origin "$BRANCH"
           done
