@@ -116,3 +116,6 @@ venv.bak/
 
 ### JetBrains template
 .idea/
+
+# VSCode
+.vscode/
