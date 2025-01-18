@@ -1,3 +1,10 @@
+# /// script
+# dependencies = [
+#     "requests",
+#     "toml",
+# ]
+# ///
+
 import re
 import sys
 
@@ -7,7 +14,7 @@ import toml
 
 def create_author_line(sections: dict) -> str:
     name = sections["author"]
-    email = sections["email"]
+    email = sections["author_email"]
 
     return "{ " + f"name = {name}, email = {email} " + "}"
 
@@ -63,7 +70,9 @@ def parse_setup(setup_file: str) -> dict[str, str | list[str]]:
     }
 
     with open(setup_file, "r") as file:
-        lines = iter(line.strip() for line in file)
+        lines = [line.strip() for line in file]
+
+    lines = iter(lines)
 
     key = ""
     for line in lines:
@@ -76,7 +85,7 @@ def parse_setup(setup_file: str) -> dict[str, str | list[str]]:
                 else:
                     sections[key] = value.strip("\"'")
 
-        elif isinstance(sections[key], list):
+        elif isinstance(sections.get(key), list):
             if line == "]":
                 continue
             sections[key].append(line.strip("\"'"))
@@ -85,7 +94,7 @@ def parse_setup(setup_file: str) -> dict[str, str | list[str]]:
     sections.pop("author_email")
     sections["readme"] = convert_long_description(sections["long_description"])
     sections.pop("long_description")
-    sections["license"] = convert_license["convert_license"]
+    sections["license"] = convert_license(sections["license"])
 
     return sections
 
@@ -95,13 +104,28 @@ def update_pyproject(toml_file: str, sections: dict[str, str | list[str]]):
     with open(toml_file, "r") as f:
         data = toml.load(f)
 
+    dependencies: dict[str, str] = {
+        re.split(r"[<>=!~]", dependency)[0].strip(): dependency
+        for dependency in data["project"]["dependencies"]
+    }
+
+    requires_python = min(
+        classifier.strip("Programming Language :: Python :: ")
+        for classifier in sections["classifiers"]
+        if "Python" in classifier
+    )
+
+    data["project"]["requires-python"] = f">={requires_python}"
+
     for key, value in sections.items():
-        if key == "url":
-            data["project.urls"]["Homepage"] = value
-        elif key == "install_requires":
-            for dependency in data["project"]["dependencies"]:
+        if key == "install_requires":
+            for dependency in dependencies:
                 if dependency not in value:
-                    data["project"]["dependencies"].remove(dependency)
+                    data["project"]["dependencies"].remove(
+                        dependencies[dependency]
+                    )
+        elif key == "url":
+            data["project"]["urls"]["Homepage"] = value
         else:
             data["project"][key] = value
 
