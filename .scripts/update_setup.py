@@ -7,6 +7,7 @@
 
 import re
 import sys
+from collections.abc import Generator
 
 import requests
 import toml
@@ -30,22 +31,24 @@ def fetch_license_data(url: str) -> dict:
     return response.json()
 
 
-def find_license_id(license_name: str, license_data: dict) -> str:
+def find_license_id(
+    license_name: str, license_data: dict
+) -> Generator[str, None, None]:
+    """Find the license ID for the given license name."""
     licenses = license_data.get("licenses", [])
     normalized_name = license_name.lower().strip()
 
-    matches = [
+    yield from (
         license["licenseId"]
         for license in licenses
-        if normalized_name in license["name"].lower()
-    ]
-    return matches[0] if matches else ""
+        if license["name"].lower().startswith(normalized_name)
+    )
 
 
 def convert_license(license: str) -> str:
     spdx_url = "https://raw.githubusercontent.com/spdx/license-list-data/refs/heads/main/json/licenses.json"
     license_data = fetch_license_data(spdx_url)
-    if spdx_id := find_license_id(license, license_data):
+    if spdx_id := next(find_license_id(license, license_data)):
         return spdx_id
     else:
         raise ValueError(f"License ID not found for '{license}'")
