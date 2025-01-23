@@ -54,6 +54,25 @@ def convert_license(license: str) -> str:
         raise ValueError(f"License ID not found for '{license}'")
 
 
+def read_lines(file_path: str) -> Generator[str, None, None]:
+    """Returns a list of lines stripped of whitespace"""
+    with open(file_path, "r", encoding="utf-8") as file:
+        yield from (line for line in map(str.strip, file) if line)
+
+
+def parse_authors(authors_file: str) -> dict[str, str]:
+    """Parse the authors file and return a dictionary of names and emails."""
+    authors = {}
+
+    for line in read_lines(authors_file):
+        if line.startswith("Listed"):
+            continue
+        name, email = line.split(" <") if "<" in line else (line, "")
+        authors[name] = email.strip(">")
+
+    return authors
+
+
 def parse_setup(setup_file: str) -> dict[str, str | list[str]]:
     setup_sections = {
         "author": str,
