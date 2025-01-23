@@ -5,6 +5,7 @@
 # ]
 # ///
 
+import ast
 import re
 import sys
 from collections.abc import Generator
@@ -155,33 +156,123 @@ def update_pyproject(toml_file: str, sections: dict[str, str | list[str]]):
         toml.dump(data, f)
 
 
-def update_setup(setup_file) -> str:
+def update_setup_config(
+    config: dict[str, str | list[str]], supported_versions: list[str]
+) -> dict[str, str | list[str]]:
+    """
+    Update the setup configuration dictionary with new values.
+    """
+    description = config["description"]
+    config["description"] = description.replace("and kindle ", "").replace(
+        "and Kindle ", ""
+    )
+
+    config["keywords"] = ["ebook", "epub"]
+
+    classifiers = config["classifiers"]
+    new_classifiers = []
+    python_section_added = False
+
+    for classifier in classifiers:
+        if "Programming Language :: Python :: " not in classifier:
+            new_classifiers.append(classifier)
+            continue
+        if python_section_added:
+            continue
+        python_section_added = True
+        new_classifiers.extend(
+            f"Programming Language :: Python :: {version}"
+            for version in supported_versions
+        )
+
+    config["classifiers"] = new_classifiers
+    return config
+
+
+def get_value(node: ast.AST) -> str | list[str]:
+    """Helper function to convert AST nodes to Python values"""
+    nodes = {
+        ast.Constant: lambda n: n.value,
+        ast.List: lambda n: [get_value(elt) for elt in n.elts],
+        ast.Call: lambda n: get_value(n.args[0]),
+    }
+    return nodes[type(node)](node)
+
+
+def make_value(value: str | list[str]) -> ast.AST:
+    nodes = {
+        str: ast.Constant(value),
+        list: ast.List(
+            elts=[ast.Constant(value=x) for x in value], ctx=ast.Load()
+        ),
+    }
+    return nodes[type(value)]
+
+
+def make_call_value(id: str, value: str) -> ast.Call:
+    return ast.Call(
+        func=ast.Name(id=id, ctx=ast.Load()), args=[make_value(value)]
+    )
+
+
+def extract_setup_keywords(ast_tree: ast.AST) -> dict[str, str | list[str]]:
+    """
+    Extract keyword arguments and their values from the setup() call in an AST
+    """
+    for node in ast.walk(ast_tree):
+        if (
+            hasattr(node, "value")
+            and hasattr(node.value, "func")
+            and hasattr(node.value.func, "id")
+            and node.value.func.id == "setup"
+        ):
+            return {
+                keyword.arg: get_value(keyword.value)
+                for keyword in node.value.keywords
+            }
+    raise ValueError("setup() call not found")
+
+
+def build_setup_ast(
+    tree: ast.AST, config: dict[str, str | list[str]]
+) -> ast.AST:
+    """
+    Build a new AST for setup.py from config dictionary.
+    """
+    keywords = []
+    for key, value in config.items():
+        ast.keyword(
+            arg=key, value=make_call_value("read", value)
+        ) if key == "long_description" else ast.keyword(
+            arg=key, value=make_value(value)
+        )
+
+    for node in ast.walk(tree):
+        if (
+            hasattr(node, "value")
+            and hasattr(node.value, "func")
+            and hasattr(node.value.func, "id")
+            and node.value.func.id == "setup"
+        ):
+            node.value.keywords = keywords
+
+    return tree
+
+
+def update_setup(setup_file: str) -> dict[str, str | list[str]]:
+    with open(setup_file, "r") as f:
+        tree = ast.parse(f.read())
+
     supported_versions = ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
 
-    with open(setup_file, "r") as f:
-        text = f.read()
-
-    text = text.replace("and kindle ", "")
-
-    allowed_keywords = r"Keywords = ['ebook', 'epub']"
-    keyword_pattern = r"Keywords = [(?:'\w+',\s?)*'\w+']"
-
-    corrected_text = re.sub(keyword_pattern, allowed_keywords, text)
-
-    programming_line_stub = '"Programming Language :: Python :: '
-    programming_line = f'{programming_line_stub}[0-9.]+,"'
-
-    old_versions = rf"^\s*{programming_line}*(?:\n\s*{programming_line})*"
-    new_versions = "\n".join(
-        f'         {programming_line_stub}{version},"'
-        for version in supported_versions
-    )
-    new_version_text = re.sub(
-        old_versions, new_versions, corrected_text, flags=re.MULTILINE
-    )
+    keywords = extract_setup_keywords(tree)
+    updated_keywords = update_setup_config(keywords, supported_versions)
+    transformed_ast = build_setup_ast(tree, updated_keywords)
 
     with open(setup_file, "w") as f:
-        f.write(new_version_text)
+        f.write(ast.unparse(transformed_ast))
+
+    return updated_keywords
 
 
 if __name__ == "__main__":
