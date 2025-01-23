@@ -1,7 +1,7 @@
 # /// script
 # dependencies = [
 #     "requests",
-#     "toml",
+#     "tomlkit",
 # ]
 # ///
 
@@ -11,7 +11,8 @@ import sys
 from collections.abc import Generator
 
 import requests
-import toml
+import tomlkit
+from tomlkit.items import Array, Table
 
 
 def create_author_line(sections: dict) -> str:
@@ -122,38 +123,148 @@ def parse_setup(setup_file: str) -> dict[str, str | list[str]]:
     return sections
 
 
-def update_pyproject(toml_file: str, sections: dict[str, str | list[str]]):
-    """Updates pyproject.toml with new values."""
-    with open(toml_file, "r") as f:
-        data = toml.load(f)
+def create_inline_array(input_dict: dict[str, str]) -> Array:
+    """Creates a tomlkit array on inline tables for authors/maintainers"""
+    array = tomlkit.array()
+    for name, email in input_dict.items():
+        inline_table = tomlkit.inline_table()
+        inline_table.update(
+            {"name": name, "email": email} if email else {"name": name}
+        )
+        array.append(inline_table)
 
+    return array
+
+
+def update_classifiers(classifiers: list[str]) -> Array:
+    """Creates a tomlkit array of project classifiers"""
+    array = tomlkit.array()
+    array.extend(classifiers)
+    return array
+
+
+def update_dependencies(
+    requirements: list[str], proj_dependencies: list[str]
+) -> Array:
+    """
+    Creates a tomlkit array of project dependencies from existing dependencies
+    and requirements
+    """
+    array = tomlkit.array()
     dependencies: dict[str, str] = {
         re.split(r"[<>=!~]", dependency)[0].strip(): dependency
-        for dependency in data["project"]["dependencies"]
+        for dependency in proj_dependencies
     }
 
+    array.extend(dependencies[package] for package in requirements)
+    return array
+
+
+def update_maintainers(sections: dict[str, str | list[str]]) -> Array:
+    """Creates an array of project maintainers"""
+    maintainers = {
+        sections["maintainer"]: sections["maintainer_email"],
+        "Ashlynn Antrobus": "ashlynn@prosepal.io",
+    }
+    return create_inline_array(maintainers)
+
+
+def update_py_version(classifiers: list[str]) -> str:
+    """Build the `requires_python` string"""
     requires_python = min(
-        classifier.strip("Programming Language :: Python :: ")
-        for classifier in sections["classifiers"]
-        if "Python" in classifier
+        (
+            classifier.strip("Programming Language :: Python :: ")
+            for classifier in classifiers
+            if "Programming Language" in classifier
+        ),
+        key=lambda version: int(version.split(".")[1]),
     )
 
-    data["project"]["requires-python"] = f">={requires_python}"
+    return f">={requires_python}"
 
-    for key, value in sections.items():
-        if key == "install_requires":
-            for dependency in dependencies:
-                if dependency not in value:
-                    data["project"]["dependencies"].remove(
-                        dependencies[dependency]
-                    )
-        elif key == "url":
-            data["project"]["urls"]["Homepage"] = value
-        else:
-            data["project"][key] = value
 
-    with open(toml_file, "w") as f:
-        toml.dump(data, f)
+def update_urls(proj_urls: Table, home_url: str) -> Table:
+    """Create a urls table from new homepage url and other existing urls"""
+    urls = tomlkit.table()
+    urls.add("Homepage", home_url)
+    for page, url in proj_urls.value.body:
+        if page != "Homepage":
+            urls.add(page, url)
+    return urls
+
+
+def update_table_item(
+    item: str, project: Table, sections: dict, authors: dict
+) -> Table:
+    """Returns the updated value for a project table item."""
+    handlers = {
+        "authors": lambda: create_inline_array(authors),
+        "classifiers": lambda: update_classifiers(sections["classifiers"]),
+        "dependencies": lambda: update_dependencies(
+            sections["install_requires"], project["dependencies"]
+        ),
+        "maintainers": lambda: update_maintainers(sections),
+        "requires-python": lambda: update_py_version(sections["classifiers"]),
+        "urls": lambda: update_urls(project["urls"], sections["url"]),
+    }
+    value = handlers.get(item, lambda: sections.get(item))()
+    if item in {"classifiers", "dependencies", "authors", "maintainers"}:
+        value.multiline(True)
+    return value
+
+
+def sort_project_table(
+    toml: tomlkit.TOMLDocument,
+    sections: dict[str, str | list],
+    authors: dict[str, str],
+) -> tomlkit.TOMLDocument:
+    order = [
+        "name",
+        "version",
+        "description",
+        "readme",
+        "requires-python",
+        "license",
+        "keywords",
+        "classifiers",
+        "maintainers",
+        "authors",
+        "nl",  # A blank line
+        "dependencies",
+        "urls",
+    ]
+
+    table = tomlkit.table()
+
+    for item in order:
+        if item == "nl":
+            table.add(tomlkit.nl())
+            continue
+        value = (
+            update_table_item(item, toml["project"], sections, authors)
+            or toml["project"][item]
+        )
+        table.raw_append(item, value)
+
+    toml["project"] = table
+
+    return toml
+
+
+def update_pyproject(
+    toml_file: str,
+    sections: dict[str, str | list[str]],
+    authors: dict[str, str],
+) -> None:
+    """Updates pyproject.toml with new values."""
+    with open(toml_file, "r", encoding="utf-8") as f:
+        doc = tomlkit.load(f)
+
+    updated_doc = sort_project_table(doc, sections, authors)
+    toml_text = re.sub("\n\n\n", "\n\n", tomlkit.dumps(updated_doc))
+
+    with open(toml_file, "w", encoding="utf-8") as f:
+        f.write(toml_text)
 
 
 def update_setup_config(
