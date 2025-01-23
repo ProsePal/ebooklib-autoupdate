@@ -1,15 +1,13 @@
 [project]
 name = "ebooklib-autoupdate"
 version = "0.18.1"
-description = "Ebook library which can handle EPUB2/EPUB3"
+description = "Ebook library which can handle EPUB2/EPUB3 format"
 readme = "README.md"
 requires-python = ">=3.6"
-license = "AGPL-3.0-only"
-authors = [
-    { name = "Aleksandar Erkalovic", email = "aerkalov@gmail.com" }
-    ]
+license = "AGPL-3.0"
 keywords = ["ebook", "epub"]
 classifiers = [
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
@@ -20,18 +18,67 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Topic :: Software Development :: Libraries :: Python Modules"
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
+maintainers = [
+    {name = "Ashlynn Antrobus", email = "ashlynn@prosepal.io"},
+    {name = "Aleksandar Erkalovic", email = "aerkalov@gmail.com"},
+]
+authors = [
+    {name = "Aleksandar Erkalovic", email = "aerkalov@gmail.com"},
+    {name = "Borko Jandras", email = "bjandras@gmail.com"},
+    {name = "the-happy-hippo", email = "th3hh0@gmail.com"},
+    {name = "Daniel James", email = "daniel@64studio.com"},
+    {name = "Mikhail Gusarov", email = "dottedmag@dottedmag.net"},
+    {name = "Raymond Yee", email = "raymond.yee@gmail.com"},
+    {name = "Chris Grice", email = "chris@chrisgrice.com"},
+    {name = "Fernando Wime", email = "fernando.d@wime.com.mx"},
+    {name = "Andy Roberts", email = "andy.roberts.uk@gmail.com"},
+    {name = "Tom McLean", email = "tom.a.mclean@gmail.com"},
+    {name = "Travis L", email = "leleu@industrialinterface.com"},
+    {name = "Helmy Giacoman", email = "helmygb@gmail.com"},
+    {name = "clach04", email = "Chris.Clark@actian.com"},
+    {name = "Edward Betts", email = "edward@4angle.com"},
+    {name = "Kennyl", email = "Kennyl@users.noreply.github.com"},
+    {name = "Oleg Pshenichniy", email = "olegpshenichniy@gmail.com"},
+    {name = "Olivier Le Thanh Duong", email = "olivier@lethanh.be"},
+    {name = "Michael Storm", email = "mstorm7@gmail.com"},
+    {name = "Sergey Markelov"},
+    {name = "Laurent Laporte", email = "tantale.solutions@gmail.com"},
+    {name = "Deborah Kaplan", email = "deborahgu@users.noreply.github.com"},
+    {name = "Willem van der Walt", email = "wvdwalt@csir.co.za"},
+    {name = "Peter", email = "82152909+repeterat@users.noreply.github.com"},
+    {name = "u8slvn", email = "u8slvn@gmail.com"},
+    {name = "tugot17", email = "piotr635@gmail.com"},
+    {name = "张悦", email = "zhangyue@xtzx.com"},
+    {name = "Morphus", email = "mr.morphus@gmail.com"},
+    {name = "Kian-Meng, Ang", email = "kianmeng@cpan.org"},
+    {name = "Jared Wong", email = "jaredlwong@gmail.com"},
+    {name = "Michael Timblin", email = "mjtimblin@gmail.com"},
+    {name = "Hsiu-Ming Chang", email = "cges30901@gmail.com"},
+    {name = "Bono Lv", email = "lvscar@gmail.com"},
+    {name = "Tom Ritchford", email = "tom@swirly.com"},
+]
+
 dependencies = [
     "lxml>=4.9.0",
-    "six>=1.0.0",
+    "six>=1.16.0",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/aleksandar-erkalovic/ebooklib"
+Homepage = "https://github.com/aerkalov/ebooklib"
 "Documentation" = "https://ebooklib.readthedocs.io"
 
 [dependency-groups]
 workflow = [
-    "toml>=0.10.2",
+    "tomlkit>=0.11.6",
 ]
+
+[build-system]
+requires = [
+    "setuptools>=76",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+license-files = []

@@ -1,27 +1,18 @@
 # /// script
 # dependencies = [
 #     "requests",
-#     "toml",
+#     "tomlkit",
 # ]
 # ///
 
+import ast
 import re
 import sys
 from collections.abc import Generator
 
 import requests
-import toml
-
-
-def create_author_line(sections: dict) -> str:
-    name = sections["author"]
-    email = sections["author_email"]
-
-    return "{ " + f"name = {name}, email = {email} " + "}"
-
-
-def convert_long_description(long_description: str) -> str:
-    return long_description.lstrip("read(").rstrip(")").strip("'\"")
+import tomlkit
+from tomlkit.items import Array, Table
 
 
 def fetch_license_data(url: str) -> dict:
@@ -54,118 +45,329 @@ def convert_license(license: str) -> str:
         raise ValueError(f"License ID not found for '{license}'")
 
 
-def parse_setup(setup_file: str) -> dict[str, str | list[str]]:
-    setup_sections = {
-        "author": str,
-        "author_email": str,
-        "url": str,
-        "license": str,
-        "description": str,
-        "long_description": str,
-        "keywords": list,
-        "classifiers": list,
-        "install_requires": list,
+def read_lines(file_path: str) -> Generator[str, None, None]:
+    """Returns a list of lines stripped of whitespace"""
+    with open(file_path, "r", encoding="utf-8") as file:
+        yield from (line for line in map(str.strip, file) if line)
+
+
+def parse_authors(authors_file: str) -> dict[str, str]:
+    """Parse the authors file and return a dictionary of names and emails."""
+    authors = {}
+
+    for line in read_lines(authors_file):
+        if line.startswith("Listed"):
+            continue
+        name, email = line.split(" <") if "<" in line else (line, "")
+        authors[name] = email.strip(">")
+
+    return authors
+
+
+def strip_string(string: str, chars: str = "\"',[]") -> str:
+    """Strip quotes, brackets, and commas from a string."""
+    return string.strip(chars)
+
+
+def convert_long_description(long_description: str) -> str:
+    return long_description.lstrip("read(").rstrip(")").strip("'\"")
+
+
+def parse_setup(
+    setup_keywords: dict[str, str | list[str]],
+) -> dict[str, str | list[str]]:
+    """Parse the setup.py file and return a dictionary of sections."""
+    setup_sections: list[str] = [
+        "version",
+        "author",
+        "author_email",
+        "url",
+        "license",
+        "description",
+        "long_description",
+        "keywords",
+        "classifiers",
+        "install_requires",
+    ]
+
+    sections = {keyword: setup_keywords[keyword] for keyword in setup_sections}
+
+    sections |= {
+        "readme": sections.pop("long_description"),
+        "license": convert_license(sections["license"]),
+        "maintainer": sections.pop("author"),
+        "maintainer_email": sections.pop("author_email"),
     }
-
-    sections: dict[str, str | list[str]] = {
-        key: [] if isinstance(val, list) else ""
-        for key, val in setup_sections.items()
-    }
-
-    with open(setup_file, "r") as file:
-        lines = [line.strip() for line in file]
-
-    lines = iter(lines)
-
-    key = ""
-    for line in lines:
-        if "=" in line:
-            key, value = (part.strip() for part in line.split("=", 1))
-            if key in setup_sections:
-                if value.startswith("["):
-                    sections[key] = []
-                    value = value.lstrip("[")
-                else:
-                    sections[key] = value.strip("\"'")
-
-        elif isinstance(sections.get(key), list):
-            if line == "]":
-                continue
-            sections[key].append(line.strip("\"'"))
-
-    sections["author"] = create_author_line(sections)
-    sections.pop("author_email")
-    sections["readme"] = convert_long_description(sections["long_description"])
-    sections.pop("long_description")
-    sections["license"] = convert_license(sections["license"])
 
     return sections
 
 
-def update_pyproject(toml_file: str, sections: dict[str, str | list[str]]):
-    """Updates pyproject.toml with new values."""
-    with open(toml_file, "r") as f:
-        data = toml.load(f)
+def create_inline_array(input_dict: dict[str, str]) -> Array:
+    """Creates a tomlkit array on inline tables for authors/maintainers"""
+    array = tomlkit.array()
+    for name, email in input_dict.items():
+        inline_table = tomlkit.inline_table()
+        inline_table.update(
+            {"name": name, "email": email} if email else {"name": name}
+        )
+        array.append(inline_table)
 
+    return array
+
+
+def update_classifiers(classifiers: list[str]) -> Array:
+    """Creates a tomlkit array of project classifiers"""
+    array = tomlkit.array()
+    array.extend(classifiers)
+    return array
+
+
+def update_dependencies(
+    requirements: list[str], proj_dependencies: list[str]
+) -> Array:
+    """
+    Creates a tomlkit array of project dependencies from existing dependencies
+    and requirements
+    """
+    array = tomlkit.array()
     dependencies: dict[str, str] = {
         re.split(r"[<>=!~]", dependency)[0].strip(): dependency
-        for dependency in data["project"]["dependencies"]
+        for dependency in proj_dependencies
     }
 
+    array.extend(dependencies[package] for package in requirements)
+    return array
+
+
+def update_maintainers(sections: dict[str, str | list[str]]) -> Array:
+    """Creates an array of project maintainers"""
+    maintainers = {
+        "Ashlynn Antrobus": "ashlynn@prosepal.io",
+        sections["maintainer"]: sections["maintainer_email"],
+    }
+    return create_inline_array(maintainers)
+
+
+def update_py_version(classifiers: list[str]) -> str:
+    """Build the `requires_python` string"""
     requires_python = min(
-        classifier.strip("Programming Language :: Python :: ")
-        for classifier in sections["classifiers"]
-        if "Python" in classifier
+        (
+            classifier.strip("Programming Language :: Python :: ")
+            for classifier in classifiers
+            if "Programming Language" in classifier
+        ),
+        key=lambda version: int(version.split(".")[1]),
     )
 
-    data["project"]["requires-python"] = f">={requires_python}"
-
-    for key, value in sections.items():
-        if key == "install_requires":
-            for dependency in dependencies:
-                if dependency not in value:
-                    data["project"]["dependencies"].remove(
-                        dependencies[dependency]
-                    )
-        elif key == "url":
-            data["project"]["urls"]["Homepage"] = value
-        else:
-            data["project"][key] = value
-
-    with open(toml_file, "w") as f:
-        toml.dump(data, f)
+    return f">={requires_python}"
 
 
-def update_setup(setup_file) -> str:
+def update_urls(proj_urls: Table, home_url: str) -> Table:
+    """Create a urls table from new homepage url and other existing urls"""
+    urls = tomlkit.table()
+    urls.add("Homepage", home_url)
+    for page, url in proj_urls.value.body:
+        if page != "Homepage":
+            urls.add(page, url)
+    return urls
+
+
+def update_table_item(
+    item: str, project: Table, sections: dict, authors: dict
+) -> Table:
+    """Returns the updated value for a project table item."""
+    handlers = {
+        "authors": lambda: create_inline_array(authors),
+        "classifiers": lambda: update_classifiers(sections["classifiers"]),
+        "dependencies": lambda: update_dependencies(
+            sections["install_requires"], project["dependencies"]
+        ),
+        "maintainers": lambda: update_maintainers(sections),
+        "requires-python": lambda: update_py_version(sections["classifiers"]),
+        "urls": lambda: update_urls(project["urls"], sections["url"]),
+    }
+    value = handlers.get(item, lambda: sections.get(item))()
+    if item in {"classifiers", "dependencies", "authors", "maintainers"}:
+        value.multiline(True)
+    return value
+
+
+def sort_project_table(
+    toml: tomlkit.TOMLDocument,
+    sections: dict[str, str | list],
+    authors: dict[str, str],
+) -> tomlkit.TOMLDocument:
+    order = [
+        "name",
+        "version",
+        "description",
+        "readme",
+        "requires-python",
+        "license",
+        "keywords",
+        "classifiers",
+        "maintainers",
+        "authors",
+        "nl",  # A blank line
+        "dependencies",
+        "urls",
+    ]
+
+    table = tomlkit.table()
+
+    for item in order:
+        if item == "nl":
+            table.add(tomlkit.nl())
+            continue
+        value = (
+            update_table_item(item, toml["project"], sections, authors)
+            or toml["project"][item]
+        )
+        table.raw_append(item, value)
+
+    toml["project"] = table
+
+    return toml
+
+
+def update_pyproject(
+    toml_file: str,
+    sections: dict[str, str | list[str]],
+    authors: dict[str, str],
+) -> None:
+    """Updates pyproject.toml with new values."""
+    with open(toml_file, "r", encoding="utf-8") as f:
+        doc = tomlkit.load(f)
+
+    updated_doc = sort_project_table(doc, sections, authors)
+    toml_text = re.sub("\n\n\n", "\n\n", tomlkit.dumps(updated_doc))
+
+    with open(toml_file, "w", encoding="utf-8") as f:
+        f.write(toml_text)
+
+
+def update_setup_config(
+    config: dict[str, str | list[str]], supported_versions: list[str]
+) -> dict[str, str | list[str]]:
+    """
+    Update the setup configuration dictionary with new values.
+    """
+    description = config["description"]
+    config["description"] = description.replace("and kindle ", "").replace(
+        "and Kindle ", ""
+    )
+
+    config["keywords"] = ["ebook", "epub"]
+
+    classifiers = config["classifiers"]
+    new_classifiers = []
+    python_section_added = False
+
+    for classifier in classifiers:
+        if "Programming Language :: Python :: " not in classifier:
+            new_classifiers.append(classifier)
+            continue
+        if python_section_added:
+            continue
+        python_section_added = True
+        new_classifiers.extend(
+            f"Programming Language :: Python :: {version}"
+            for version in supported_versions
+        )
+
+    config["classifiers"] = new_classifiers
+    return config
+
+
+def get_value(node: ast.AST) -> str | list[str]:
+    """Helper function to convert AST nodes to Python values"""
+    nodes = {
+        ast.Constant: lambda n: n.value,
+        ast.List: lambda n: [get_value(elt) for elt in n.elts],
+        ast.Call: lambda n: get_value(n.args[0]),
+    }
+    return nodes[type(node)](node)
+
+
+def make_value(value: str | list[str]) -> ast.AST:
+    nodes = {
+        str: ast.Constant(value),
+        list: ast.List(
+            elts=[ast.Constant(value=x) for x in value], ctx=ast.Load()
+        ),
+    }
+    return nodes[type(value)]
+
+
+def make_call_value(id: str, value: str) -> ast.Call:
+    return ast.Call(
+        func=ast.Name(id=id, ctx=ast.Load()), args=[make_value(value)]
+    )
+
+
+def is_setup_call(node: ast.AST) -> bool:
+    """
+    Check if the node is a call to the `setup` function.
+    """
+    return (
+        hasattr(node, "value")
+        and hasattr(node.value, "func")
+        and hasattr(node.value.func, "id")
+        and node.value.func.id == "setup"
+    )
+
+
+def extract_setup_keywords(ast_tree: ast.AST) -> dict[str, str | list[str]]:
+    """
+    Extract keyword arguments and their values from the setup() call in an AST
+    """
+    for node in ast.walk(ast_tree):
+        if is_setup_call(node):
+            return {
+                keyword.arg: get_value(keyword.value)
+                for keyword in node.value.keywords
+            }
+    raise ValueError("setup() call not found")
+
+
+def build_setup_ast(
+    tree: ast.AST, config: dict[str, str | list[str]]
+) -> ast.AST:
+    """
+    Build a new AST for setup.py from config dictionary.
+    """
+    keywords = [
+        ast.keyword(arg=key, value=make_call_value("read", value))
+        if key == "long_description"
+        else ast.keyword(arg=key, value=make_value(value))
+        for key, value in config.items()
+    ]
+
+    for node in ast.walk(tree):
+        if is_setup_call(node):
+            node.value.keywords = keywords
+
+    return tree
+
+
+def update_setup(setup_file: str) -> dict[str, str | list[str]]:
+    with open(setup_file, "r") as f:
+        tree = ast.parse(f.read())
+
     supported_versions = ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
 
-    with open(setup_file, "r") as f:
-        text = f.read()
-
-    text = text.replace("and kindle ", "")
-
-    allowed_keywords = r"Keywords = ['ebook', 'epub']"
-    keyword_pattern = r"Keywords = [(?:'\w+',\s?)*'\w+']"
-
-    corrected_text = re.sub(keyword_pattern, allowed_keywords, text)
-
-    programming_line_stub = '"Programming Language :: Python :: '
-    programming_line = f'{programming_line_stub}[0-9.]+,"'
-
-    old_versions = rf"^\s*{programming_line}*(?:\n\s*{programming_line})*"
-    new_versions = "\n".join(
-        f'         {programming_line_stub}{version},"'
-        for version in supported_versions
-    )
-    new_version_text = re.sub(
-        old_versions, new_versions, corrected_text, flags=re.MULTILINE
-    )
+    keywords = extract_setup_keywords(tree)
+    updated_keywords = update_setup_config(keywords, supported_versions)
+    transformed_ast = build_setup_ast(tree, updated_keywords)
 
     with open(setup_file, "w") as f:
-        f.write(new_version_text)
+        f.write(ast.unparse(transformed_ast))
+
+    return updated_keywords
 
 
 if __name__ == "__main__":
-    update_setup(sys.argv[1])
-    sections = parse_setup(sys.argv[1])
-    update_pyproject(sys.argv[2], sections)
+    keywords = update_setup(sys.argv[1])
+    authors = parse_authors(sys.argv[2])
+    sections = parse_setup(keywords)
+    update_pyproject(sys.argv[3], sections, authors)

@@ -2,7 +2,7 @@
 
 This is a fork of the popular Ebooklib library that aims to keep a package updated with changes from the original codebase. Any changes to [https://github.com/aerkalov/ebooklib] are merged into this package on a weekly basis.
 
-# About EbookLib
+## About EbookLib
 
 EbookLib is a Python library for managing EPUB2/EPUB3 files. It's capable of reading and writing EPUB files programmatically.
 
@@ -16,9 +16,9 @@ Packages of EbookLib for GNU/Linux are available in [Debian](https://packages.de
 
 Sphinx documentation is generated from the templates in the docs/ directory and made available at <http://ebooklib.readthedocs.io>
 
-# Usage
+## Usage
 
-## Reading
+### Reading
 
 ```py
 import ebooklib
@@ -30,7 +30,7 @@ for image in book.get_items_of_type(ebooklib.ITEM_IMAGE):
     print(image)
 ```
 
-## Writing
+### Writing
 
 ```py
 from ebooklib import epub
@@ -101,10 +101,10 @@ book.spine = ["nav", c1]
 epub.write_epub("test.epub", book, {})
 ```
 
-# License
+## License
 
 EbookLib is licensed under the [AGPL license](LICENSE.txt).
 
-# Authors
+## Authors
 
 Full list of authors is in [AUTHORS.txt](AUTHORS.txt) file.

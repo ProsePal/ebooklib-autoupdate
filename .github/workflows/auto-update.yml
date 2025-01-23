@@ -12,6 +12,7 @@ permissions:
 env:
   VERSION_FILE: VERSION.txt
   SETUP_FILE: setup.py
+  AUTHORS_FILE: AUTHORS.txt
   PYPROJECT_FILE: pyproject.toml
   README_FILE: README.md
 
@@ -92,27 +93,31 @@ jobs:
           git add ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }} ${{ env.PYPROJECT_FILE }}
           git commit -m "Auto-increment version to $NEW_VERSION"
 
-          - name: Install uv
-          if: steps.upstream_changes.outputs.updated_version == 'true'
-          uses: astral-sh/setup-uv@v5
-          with:
-            enable-cache: true
+      - name: Install uv
+        if: steps.upstream_changes.outputs.updated_version == 'true'
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: "Set up Python"
+        if: steps.upstream_changes.outputs.updated_version == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
 
       - name: Update supported Python versions in setup.py
         if: steps.upstream_changes.outputs.update_setup == 'true'
         run: |
-          uv sync --group workflow
-          chmod +x .venv/bin/activate
-          ./.venv/bin/activate
-          /.venv/bin/python .scripts/update_setup.py "${{ env.SETUP_FILE }}" "${{ env.PYPROJECT_FILE }}"
-          git add ${{ env.SETUP_FILE }}
+          uv run .scripts/update_setup.py "${{ env.SETUP_FILE }}" "${{ env.AUTHORS_FILE }}" "${{ env.PYPROJECT_FILE }}"
+          uvx ruff format
+          git add "${{ env.SETUP_FILE }}"" "${{ env.PYPROJECT_FILE }}"
           git commit -m "Update supported Python versions"
 
       - name: Update README
         if: steps.upstream_changes.outputs.update_readme == 'true'
         run: |
           python .scripts/update_readme.py "${{ env.README_FILE }}"
-          git add ${{ env.README_FILE }}
+          git add "${{ env.README_FILE }}"
           git commit -m "Update README"
 
       - name: Push changes to fork
