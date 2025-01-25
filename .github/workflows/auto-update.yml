@@ -12,6 +12,7 @@ permissions:
 env:
   VERSION_FILE: VERSION.txt
   SETUP_FILE: setup.py
+  AUTHORS_FILE: AUTHORS.txt
   PYPROJECT_FILE: pyproject.toml
   README_FILE: README.md
 
@@ -104,15 +105,16 @@ jobs:
           uv sync --group workflow
           chmod +x .venv/bin/activate
           ./.venv/bin/activate
-          /.venv/bin/python .scripts/update_setup.py "${{ env.SETUP_FILE }}" "${{ env.PYPROJECT_FILE }}"
-          git add ${{ env.SETUP_FILE }}
+          /.venv/bin/python .scripts/update_setup.py "${{ env.SETUP_FILE }}" "${{ env.AUTHORS_FILE }}" "${{ env.PYPROJECT_FILE }}"
+          uvx ruff format
+          git add "${{ env.SETUP_FILE }}"" "${{ env.PYPROJECT_FILE }}"
           git commit -m "Update supported Python versions"
 
       - name: Update README
         if: steps.upstream_changes.outputs.update_readme == 'true'
         run: |
           python .scripts/update_readme.py "${{ env.README_FILE }}"
-          git add ${{ env.README_FILE }}
+          git add "${{ env.README_FILE }}"
           git commit -m "Update README"
 
       - name: Push changes to fork
