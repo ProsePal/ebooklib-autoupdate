@@ -330,12 +330,14 @@ def build_setup_ast(
     Build a new AST for setup.py from config dictionary.
     """
     keywords = []
-    for key, value in config.items():
-        ast.keyword(
-            arg=key, value=make_call_value("read", value)
-        ) if key == "long_description" else ast.keyword(
-            arg=key, value=make_value(value)
+    keywords.extend(
+        (
+            ast.keyword(arg=key, value=make_call_value("read", value))
+            if key == "long_description"
+            else ast.keyword(arg=key, value=make_value(value))
         )
+        for key, value in config.items()
+    )
 
     for node in ast.walk(tree):
         if (
