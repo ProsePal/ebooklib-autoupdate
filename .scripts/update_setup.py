@@ -305,17 +305,24 @@ def make_call_value(id: str, value: str) -> ast.Call:
     )
 
 
+def is_setup_call(node: ast.AST) -> bool:
+    """
+    Check if the node is a call to the `setup` function.
+    """
+    return (
+        hasattr(node, "value")
+        and hasattr(node.value, "func")
+        and hasattr(node.value.func, "id")
+        and node.value.func.id == "setup"
+    )
+
+
 def extract_setup_keywords(ast_tree: ast.AST) -> dict[str, str | list[str]]:
     """
     Extract keyword arguments and their values from the setup() call in an AST
     """
     for node in ast.walk(ast_tree):
-        if (
-            hasattr(node, "value")
-            and hasattr(node.value, "func")
-            and hasattr(node.value.func, "id")
-            and node.value.func.id == "setup"
-        ):
+        if is_setup_call(node):
             return {
                 keyword.arg: get_value(keyword.value)
                 for keyword in node.value.keywords
@@ -329,23 +336,15 @@ def build_setup_ast(
     """
     Build a new AST for setup.py from config dictionary.
     """
-    keywords = []
-    keywords.extend(
-        (
-            ast.keyword(arg=key, value=make_call_value("read", value))
-            if key == "long_description"
-            else ast.keyword(arg=key, value=make_value(value))
-        )
+    keywords = [
+        ast.keyword(arg=key, value=make_call_value("read", value))
+        if key == "long_description"
+        else ast.keyword(arg=key, value=make_value(value))
         for key, value in config.items()
-    )
+    ]
 
     for node in ast.walk(tree):
-        if (
-            hasattr(node, "value")
-            and hasattr(node.value, "func")
-            and hasattr(node.value.func, "id")
-            and node.value.func.id == "setup"
-        ):
+        if is_setup_call(node):
             node.value.keywords = keywords
 
     return tree
