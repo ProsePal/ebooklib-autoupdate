@@ -15,17 +15,6 @@ import tomlkit
 from tomlkit.items import Array, Table
 
 
-def create_author_line(sections: dict) -> str:
-    name = sections["author"]
-    email = sections["author_email"]
-
-    return "{ " + f"name = {name}, email = {email} " + "}"
-
-
-def convert_long_description(long_description: str) -> str:
-    return long_description.lstrip("read(").rstrip(")").strip("'\"")
-
-
 def fetch_license_data(url: str) -> dict:
     """Fetch the license JSON from the given URL."""
     response = requests.get(url, timeout=10)
@@ -75,50 +64,40 @@ def parse_authors(authors_file: str) -> dict[str, str]:
     return authors
 
 
-def parse_setup(setup_file: str) -> dict[str, str | list[str]]:
-    setup_sections = {
-        "author": str,
-        "author_email": str,
-        "url": str,
-        "license": str,
-        "description": str,
-        "long_description": str,
-        "keywords": list,
-        "classifiers": list,
-        "install_requires": list,
+def strip_string(string: str, chars: str = "\"',[]") -> str:
+    """Strip quotes, brackets, and commas from a string."""
+    return string.strip(chars)
+
+
+def convert_long_description(long_description: str) -> str:
+    return long_description.lstrip("read(").rstrip(")").strip("'\"")
+
+
+def parse_setup(
+    setup_keywords: dict[str, str | list[str]],
+) -> dict[str, str | list[str]]:
+    """Parse the setup.py file and return a dictionary of sections."""
+    setup_sections: list[str] = [
+        "version",
+        "author",
+        "author_email",
+        "url",
+        "license",
+        "description",
+        "long_description",
+        "keywords",
+        "classifiers",
+        "install_requires",
+    ]
+
+    sections = {keyword: setup_keywords[keyword] for keyword in setup_sections}
+
+    sections |= {
+        "readme": sections.pop("long_description"),
+        "license": convert_license(sections["license"]),
+        "maintainer": sections.pop("author"),
+        "maintainer_email": sections.pop("author_email"),
     }
-
-    sections: dict[str, str | list[str]] = {
-        key: [] if isinstance(val, list) else ""
-        for key, val in setup_sections.items()
-    }
-
-    with open(setup_file, "r") as file:
-        lines = [line.strip() for line in file]
-
-    lines = iter(lines)
-
-    key = ""
-    for line in lines:
-        if "=" in line:
-            key, value = (part.strip() for part in line.split("=", 1))
-            if key in setup_sections:
-                if value.startswith("["):
-                    sections[key] = []
-                    value = value.lstrip("[")
-                else:
-                    sections[key] = value.strip("\"'")
-
-        elif isinstance(sections.get(key), list):
-            if line == "]":
-                continue
-            sections[key].append(line.strip("\"'"))
-
-    sections["author"] = create_author_line(sections)
-    sections.pop("author_email")
-    sections["readme"] = convert_long_description(sections["long_description"])
-    sections.pop("long_description")
-    sections["license"] = convert_license(sections["license"])
 
     return sections
 
@@ -163,8 +142,8 @@ def update_dependencies(
 def update_maintainers(sections: dict[str, str | list[str]]) -> Array:
     """Creates an array of project maintainers"""
     maintainers = {
-        sections["maintainer"]: sections["maintainer_email"],
         "Ashlynn Antrobus": "ashlynn@prosepal.io",
+        sections["maintainer"]: sections["maintainer_email"],
     }
     return create_inline_array(maintainers)
 
@@ -387,6 +366,7 @@ def update_setup(setup_file: str) -> dict[str, str | list[str]]:
 
 
 if __name__ == "__main__":
-    update_setup(sys.argv[1])
-    sections = parse_setup(sys.argv[1])
-    update_pyproject(sys.argv[2], sections)
+    keywords = update_setup(sys.argv[1])
+    authors = parse_authors(sys.argv[2])
+    sections = parse_setup(keywords)
+    update_pyproject(sys.argv[3], sections, authors)
