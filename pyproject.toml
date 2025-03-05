@@ -72,3 +72,12 @@ Homepage = "https://github.com/aerkalov/ebooklib"
 workflow = [
     "tomlkit>=0.11.6",
 ]
+
+[build-system]
+requires = [
+    "setuptools>=75.8.2",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+license-files = []
