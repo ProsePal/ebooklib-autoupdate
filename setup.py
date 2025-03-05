@@ -24,6 +24,7 @@ setup(
     long_description_content_type="text/markdown",
     keywords=["ebook", "epub"],
     classifiers=[
+        "License :: OSI Approved :: GNU Affero General Public License v3",
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "Operating System :: OS Independent",
