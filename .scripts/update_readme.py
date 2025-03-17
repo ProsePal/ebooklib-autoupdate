@@ -3,8 +3,25 @@ import sys
 
 
 def update_readme(readme_file: str) -> None:
+    """
+    Updates README.md with new values and a preamble.
+
+    This function checks if updates are necessary, and if so, splits the
+    readme file into sections split at code-fenced blocks. At non-code fenced
+    sections, it increments the heading levels by one and removes the `and
+    kindle ` prefix.
+
+    It then joins the sections back together and writes the updated content
+    back to the file along with a preamble.
+
+    Args:
+        readme_file (str): The path to the README.md file.
+    """
     with open(readme_file, "r") as f:
         content: str = f.read()
+
+    if content.startswith("# EbookLib-autoupdate"):
+        return
 
     sections: list[str] = re.split(r"(```.*?```)", content, flags=re.DOTALL)
     updated_sections: list[str] = []
