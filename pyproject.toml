@@ -4,7 +4,7 @@ version = "0.18.1"
 description = "Ebook library which can handle EPUB2/EPUB3 format"
 readme = "README.md"
 requires-python = ">=3.6"
-license = {text = "GNU Affero General Public License v3"}
+license = "AGPL-3.0"
 keywords = ["ebook", "epub"]
 classifiers = [
     "License :: OSI Approved :: GNU Affero General Public License v3",
