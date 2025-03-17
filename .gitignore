@@ -119,3 +119,4 @@ venv.bak/
 
 # VSCode
 .vscode/
+.qodo
