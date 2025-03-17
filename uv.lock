@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.6"
 resolution-markers = [
     "python_full_version >= '3.9'",
@@ -10,7 +11,7 @@ resolution-markers = [
 [[package]]
 name = "ebooklib-autoupdate"
 version = "0.18.1"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "lxml" },
     { name = "six" },
@@ -26,7 +27,7 @@ workflow = [
 [package.metadata]
 requires-dist = [
     { name = "lxml", specifier = ">=4.9.0" },
-    { name = "six", specifier = ">=1.0.0" },
+    { name = "six", specifier = ">=1.16.0" },
 ]
 
 [package.metadata.requires-dev]
