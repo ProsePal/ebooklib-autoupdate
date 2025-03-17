@@ -8,6 +8,7 @@
 import ast
 import re
 import sys
+import textwrap
 from collections.abc import Generator
 
 import requests
@@ -40,7 +41,7 @@ def convert_license(license: str) -> str:
     spdx_url = "https://raw.githubusercontent.com/spdx/license-list-data/refs/heads/main/json/licenses.json"
     license_data = fetch_license_data(spdx_url)
     if spdx_id := next(find_license_id(license, license_data)):
-        return spdx_id
+        return "{text = %s}" % spdx_id
     else:
         raise ValueError(f"License ID not found for '{license}'")
 
@@ -246,7 +247,7 @@ def update_pyproject(
         f.write(toml_text)
 
 
-def update_setup_config(
+def update_config(
     config: dict[str, str | list[str]], supported_versions: list[str]
 ) -> dict[str, str | list[str]]:
     """
@@ -264,6 +265,8 @@ def update_setup_config(
     python_section_added = False
 
     for classifier in classifiers:
+        if "License" in classifier:
+            continue
         if "Programming Language :: Python :: " not in classifier:
             new_classifiers.append(classifier)
             continue
@@ -287,22 +290,6 @@ def get_value(node: ast.AST) -> str | list[str]:
         ast.Call: lambda n: get_value(n.args[0]),
     }
     return nodes[type(node)](node)
-
-
-def make_value(value: str | list[str]) -> ast.AST:
-    nodes = {
-        str: ast.Constant(value),
-        list: ast.List(
-            elts=[ast.Constant(value=x) for x in value], ctx=ast.Load()
-        ),
-    }
-    return nodes[type(value)]
-
-
-def make_call_value(id: str, value: str) -> ast.Call:
-    return ast.Call(
-        func=ast.Name(id=id, ctx=ast.Load()), args=[make_value(value)]
-    )
 
 
 def is_setup_call(node: ast.AST) -> bool:
@@ -330,44 +317,35 @@ def extract_setup_keywords(ast_tree: ast.AST) -> dict[str, str | list[str]]:
     raise ValueError("setup() call not found")
 
 
-def build_setup_ast(
-    tree: ast.AST, config: dict[str, str | list[str]]
-) -> ast.AST:
-    """
-    Build a new AST for setup.py from config dictionary.
-    """
-    keywords = [
-        ast.keyword(arg=key, value=make_call_value("read", value))
-        if key == "long_description"
-        else ast.keyword(arg=key, value=make_value(value))
-        for key, value in config.items()
-    ]
-
-    for node in ast.walk(tree):
-        if is_setup_call(node):
-            node.value.keywords = keywords
-
-    return tree
-
-
-def update_setup(setup_file: str) -> dict[str, str | list[str]]:
+def update_keywords(setup_file: str) -> dict[str, str | list[str]]:
     with open(setup_file, "r") as f:
         tree = ast.parse(f.read())
 
     supported_versions = ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
 
     keywords = extract_setup_keywords(tree)
-    updated_keywords = update_setup_config(keywords, supported_versions)
-    transformed_ast = build_setup_ast(tree, updated_keywords)
+    return update_config(keywords, supported_versions)
+
+
+def replace_setup(setup_file: str) -> None:
+    legacy_setup = textwrap.dedent("""\
+        from setuptools import setup
+
+        setup()
+    """).strip("\n")
 
     with open(setup_file, "w") as f:
-        f.write(ast.unparse(transformed_ast))
+        f.write(legacy_setup)
 
-    return updated_keywords
+
+def main(author_file: str, setup_file: str, pyproject_file: str) -> None:
+    authors = parse_authors(author_file)
+    keywords = update_keywords(setup_file)
+    sections = parse_setup(keywords)
+    update_pyproject(pyproject_file, sections, authors)
+    replace_setup(setup_file)
 
 
 if __name__ == "__main__":
-    keywords = update_setup(sys.argv[1])
-    authors = parse_authors(sys.argv[2])
-    sections = parse_setup(keywords)
-    update_pyproject(sys.argv[3], sections, authors)
+    _, setup_file, author_file, pyproject_file = sys.argv
+    main(author_file, setup_file, pyproject_file)
