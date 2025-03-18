@@ -11,7 +11,7 @@ permissions:
   id-token: write
 
 jobs:
-  process:
+  update-files:
     uses: ./.github/workflows/update-files.yml
     with:
       updated_version: true
