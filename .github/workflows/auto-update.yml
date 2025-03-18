@@ -11,10 +11,6 @@ permissions:
 
 env:
   VERSION_FILE: VERSION.txt
-  SETUP_FILE: setup.py
-  AUTHORS_FILE: AUTHORS.txt
-  PYPROJECT_FILE: pyproject.toml
-  README_FILE: README.md
 
 jobs:
   update:
@@ -43,22 +39,10 @@ jobs:
         id: upstream_changes
         run: |
           VERSION_TIMESTAMP=$(git log -1 --format=%at -- ${{ env.VERSION_FILE }})
-          UPSTREAM_SETUP_TIMESTAMP=$(git log upstream/master -1 --format=%at -- ${{ env.SETUP_FILE }})
-          UPSTREAM_README_TIMESTAMP=$(git log upstream/master -1 --format=%at -- ${{ env.README_FILE }})
           if [[ $(git log upstream/master -1 --format=%at) -gt $VERSION_TIMESTAMP ]]; then
             echo "updated_version=true" >> $GITHUB_OUTPUT
           else
             echo "updated_version=false" >> $GITHUB_OUTPUT
-          fi
-          if [[ $UPSTREAM_SETUP_TIMESTAMP -gt $VERSION_TIMESTAMP ]]; then
-            echo "update_setup=true" >> $GITHUB_OUTPUT
-          else
-            echo "update_setup=false" >> $GITHUB_OUTPUT
-          fi
-          if [[ $UPSTREAM_README_TIMESTAMP -gt $VERSION_TIMESTAMP ]]; then
-            echo "update_readme=true" >> $GITHUB_OUTPUT
-          else
-            echo "update_readme=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Merge upstream changes
@@ -66,69 +50,14 @@ jobs:
         run: |
           {
             echo "${{ env.VERSION_FILE }} merge=theirs"
-            if [[ "${{ steps.upstream_changes.outputs.update_setup }}" == "true" ]]; then
-              echo "${{ env.SETUP_FILE }} merge=theirs"
-            else
-              echo "${{ env.SETUP_FILE }} merge=ours"
-            fi
           } > .gitattributes
           git merge upstream/master --no-edit
 
-      - name: Increment version
-        id: version
+      - name: Update files
         if: steps.upstream_changes.outputs.updated_version == 'true'
-        run: |
-          UPSTREAM_VERSION=$(grep -Eo '[0-9]+\.[0-9]+' "${{ env.VERSION_FILE }}")
-          IFS='.' read -r UPSTREAM_MAJOR UPSTREAM_MINOR <<< "$UPSTREAM_VERSION"
-          CURRENT_VERSION="${{ steps.fork_state.outputs.current_version }}"
-          IFS='.' read -r CURRENT_MAJOR CURRENT_MINOR PATCH <<< "$CURRENT_VERSION"
-          if [[ $UPSTREAM_MAJOR == $CURRENT_MAJOR && $UPSTREAM_MINOR == $CURRENT_MINOR ]]; then
-            PATCH=$(($PATCH + 1))
-            NEW_VERSION="$CURRENT_MAJOR.$CURRENT_MINOR.$PATCH"
-          else
-            NEW_VERSION="$UPSTREAM_MAJOR.$UPSTREAM_MINOR.0"
-          fi
-          sed -i "0,/$UPSTREAM_VERSION/s//$NEW_VERSION/" ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }}
-          sed -i "0,/$CURRENT_VERSION/s//$NEW_VERSION" ${{ env.PYPROJECT_FILE }}
-          git add ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }} ${{ env.PYPROJECT_FILE }}
-          git commit -m "Auto-increment version to $NEW_VERSION"
-
-      - name: Install uv
-        if: steps.upstream_changes.outputs.updated_version == 'true'
-        uses: astral-sh/setup-uv@v5
+        uses: ./.github/workflows/update-files.yml
         with:
-          enable-cache: true
-
-      - name: "Set up Python"
-        if: steps.upstream_changes.outputs.updated_version == 'true'
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Update supported Python versions in setup.py
-        if: steps.upstream_changes.outputs.update_setup == 'true'
-        run: |
-          uv run .scripts/update_setup.py "${{ env.SETUP_FILE }}" "${{ env.AUTHORS_FILE }}" "${{ env.PYPROJECT_FILE }}"
-          uvx ruff format
-          git add "${{ env.SETUP_FILE }}"" "${{ env.PYPROJECT_FILE }}"
-          git commit -m "Update supported Python versions"
-
-      - name: Update README
-        if: steps.upstream_changes.outputs.update_readme == 'true'
-        run: |
-          python .scripts/update_readme.py "${{ env.README_FILE }}"
-          git add "${{ env.README_FILE }}"
-          git commit -m "Update README"
-
-      - name: Push changes to fork
-        if: steps.upstream_changes.outputs.updated_version == 'true'
-        run: git push origin master
-
-      - name: Build and publish
-        if: steps.upstream_changes.outputs.updated_version == 'true'
-        run: |
-          uv build
-          uv publish
+          updated_version: ${{ steps.upstream_changes.outputs.updated_version }}
 
       - name: Sync new branches
         run: |
