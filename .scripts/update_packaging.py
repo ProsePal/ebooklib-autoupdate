@@ -10,6 +10,7 @@ import re
 import sys
 from collections.abc import Callable, Generator
 from enum import Enum
+from functools import cache
 from pathlib import Path
 from typing import Any, TypeAlias
 
@@ -31,6 +32,16 @@ PyProject: TypeAlias = dict[str, Configuration]
 class Format(Enum):
     SETUP = 1
     PYPROJECT = 2
+
+
+@cache
+def build_supported_versions_list(
+    min_version: int = MIN_PY3_SUPPORTED_VERSION,
+    max_version: int = MAX_PY3_SUPPORTED_VERSION,
+) -> list[str]:
+    """Build a list of supported Python versions."""
+    assert min_version <= max_version
+    return [f"3.{version}" for version in range(min_version, max_version + 1)]
 
 
 def replace_setup(setup_path: Path, legacy_setup: str = LEGACY_SETUP) -> None:
@@ -102,16 +113,10 @@ def update_maintainers(
     return create_inline_array(maintainers)
 
 
-def update_py_version(classifiers: list[str]) -> str:
+def min_supported_py_version() -> str:
     """Build the `requires_python` string"""
-    requires_python = min(
-        (
-            classifier.strip("Programming Language :: Python :: ")
-            for classifier in classifiers
-            if "Programming Language" in classifier
-        ),
-        key=lambda version: int(version.split(".")[1]),
-    )
+    versions = build_supported_versions_list()
+    requires_python = min(versions)
 
     return f">={requires_python}"
 
@@ -136,9 +141,10 @@ def update_table_item(
         case "classifiers":
             value = update_classifiers(sections["classifiers"])
         case "dependencies":
-            value = update_dependencies(
-                sections.get(
-                    "dependencies",
+            value = (
+                update_dependencies("", sections.get("dependencies"))
+                if sections.get("dependencies")
+                else update_dependencies(
                     sections["install_requires"],
                     project["dependencies"],
                 )
@@ -146,9 +152,7 @@ def update_table_item(
         case "maintainers":
             value = update_maintainers(sections)
         case "requires-python":
-            value = sections.get(
-                "requires_python", update_py_version(sections["classifiers"])
-            )
+            value = sections.get("requires_python", min_supported_py_version())
         case "urls":
             value = sections.get(
                 "urls", update_urls(project["urls"], sections["url"])
@@ -212,15 +216,6 @@ def update_pyproject(
 
     with toml_path.open("w", encoding="utf-8") as f:
         f.write(toml_text)
-
-
-def build_supported_versions_list(
-    min_version: int = MIN_PY3_SUPPORTED_VERSION,
-    max_version: int = MAX_PY3_SUPPORTED_VERSION,
-) -> list[str]:
-    """Build a list of supported Python versions."""
-    assert min_version <= max_version
-    return [f"3.{version}" for version in range(min_version, max_version + 1)]
 
 
 def find_license_id(
@@ -328,14 +323,14 @@ class ProjectParser:
     ]
 
     FORMAT_SECTIONS = {
-        Format.SETUP_PY: [
+        Format.SETUP: [
             "author",
             "author_email",
             "long_description",
             "url",
             "install_requires",
         ],
-        Format.PYPROJECT_TOML: [
+        Format.PYPROJECT: [
             "authors",
             "maintainers",
             "readme",
@@ -363,7 +358,7 @@ class ProjectParser:
 
     @staticmethod
     def detect_format(
-        setup_path: Path, legacy_setup_content: str = ""
+        setup_path: Path, legacy_setup_content: str = LEGACY_SETUP
     ) -> Format:
         """
         Detect the configuration format based on setup.py content.
@@ -398,7 +393,7 @@ class ProjectParser:
         """
         raw_config = (
             parse_ast(setup_path)
-            if config_format == Format.SETUP_PY
+            if config_format == Format.SETUP
             else parse_pyproject(pyproject_path)
         )
 
