@@ -1,0 +1,102 @@
+name: Update Files
+
+on:
+  workflow_call:
+    inputs:
+      updated_version:
+        required: true
+        type: boolean
+
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  VERSION_FILE: VERSION.txt
+  SETUP_FILE: setup.py
+  AUTHORS_FILE: AUTHORS.txt
+  PYPROJECT_FILE: pyproject.toml
+  README_FILE: README.md
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Git user
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Read current version
+        id: fork_state
+        run: |
+          CURRENT_VERSION=$(grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' "${{ env.VERSION_FILE }}")
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Increment version
+        id: version
+        run: |
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${{ steps.fork_state.outputs.current_version }}"
+          PATCH=$(($PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          sed -i "0,/${{ steps.fork_state.outputs.current_version }}/s//${NEW_VERSION}/" ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }}
+          sed -i "0,/${{ steps.fork_state.outputs.current_version }}/s//${NEW_VERSION}/" ${{ env.PYPROJECT_FILE }}
+          git add ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }} ${{ env.PYPROJECT_FILE }}
+          git commit -m "Auto-increment version to $NEW_VERSION"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Download license artifact
+        id: license-artifact
+        uses: actions/download-artifact@v3
+        continue-on-error: true
+        with:
+          name: license-data
+          path: ./scripts/license-data
+
+      - name: Download license data
+        if: steps.license-artifact.outcome == 'failure'
+        run: uv run .scripts/download_license_data.py
+
+      - name: Upload license artifact
+        if: steps.license-artifact.outcome == 'failure'
+        uses: actions/upload-artifact@v3
+        with:
+          name: license-data
+          path: ./scripts/license-data
+
+      - name: Add license data to env
+        run: echo "LICENSE_DATA=$(pwd)/scripts/license-data" >> $GITHUB_ENV
+
+      - name: Update packaging
+        run: |
+          uv run .scripts/update_packaging.py "${{ env.SETUP_FILE }}" "${{ env.AUTHORS_FILE }}" "${{ env.PYPROJECT_FILE }}" "${{ env.LICENSE_DATA }}"
+          uvx ruff format
+          git add "${{ env.SETUP_FILE }}" "${{ env.PYPROJECT_FILE }}"
+          git commit -m "Update supported Python versions"
+
+      - name: Update README
+        run: |
+          uv run .scripts/update_readme.py "${{ env.README_FILE }}"
+          git add "${{ env.README_FILE }}"
+          git commit -m "Update README"
+
+      - name: Push changes
+        run: git push origin master
+
+      - name: Build and publish
+        run: |
+          uv build
+          uv publish
