@@ -20,7 +20,7 @@ env:
   README_FILE: README.md
 
 jobs:
-  process:
+  update-files:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -60,7 +60,7 @@ jobs:
 
       - name: Download license artifact
         id: license-artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         continue-on-error: true
         with:
           name: license-data
