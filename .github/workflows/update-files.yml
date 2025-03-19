@@ -58,24 +58,23 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Download license artifact
-        id: license-artifact
-        uses: actions/download-artifact@v4
-        continue-on-error: true
+      - name: Restore license data from cache
+        id: license-cache
+        uses: actions/cache@v4
         with:
-          name: license-data
           path: ./.scripts/license-data.json
+          key: license-data
 
       - name: Download license data
-        if: steps.license-artifact.outcome == 'failure'
+        if: steps.license-cache.outputs.cache-hit != 'true'
         run: uv run .scripts/download_license_data.py
 
-      - name: Upload license artifact
-        if: steps.license-artifact.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+      - name: Cache license data
+        if: steps.license-cache.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
         with:
-          name: license-data
           path: ./.scripts/license-data.json
+          key: license-data
 
       - name: Add license data to env
         run: echo "LICENSE_DATA=$(pwd)/.scripts/license-data.json" >> $GITHUB_ENV
