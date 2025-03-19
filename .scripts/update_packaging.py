@@ -376,7 +376,7 @@ class ProjectParser:
         content = setup_path.read_text(encoding="utf-8")
         return (
             Format.PYPROJECT
-            if content.strip() == legacy_setup_content
+            if content.strip() == legacy_setup_content.strip()
             else Format.SETUP
         )
 
