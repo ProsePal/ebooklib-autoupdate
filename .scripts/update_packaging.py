@@ -361,7 +361,7 @@ class ProjectParser:
 
     @staticmethod
     def detect_format(
-        setup_path: Path, legacy_setup_content: str = ""
+        setup_path: Path, legacy_setup_content: str = LEGACY_SETUP
     ) -> Format:
         """
         Detect the configuration format based on setup.py content.
