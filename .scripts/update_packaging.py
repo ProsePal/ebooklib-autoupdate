@@ -30,8 +30,8 @@ PyProject: TypeAlias = dict[str, Configuration]
 
 
 class Format(Enum):
-    SETUP = 1
-    PYPROJECT = 2
+    SETUP = "setup.py"
+    PYPROJECT = "pyproject.toml"
 
 
 @cache
@@ -152,7 +152,7 @@ def update_table_item(
         case "maintainers":
             value = update_maintainers(sections)
         case "requires-python":
-            value = sections.get("requires_python", min_supported_py_version())
+            value = sections.get("requires-python", min_supported_py_version())
         case "urls":
             value = sections.get(
                 "urls", update_urls(project["urls"], sections["url"])
@@ -315,6 +315,7 @@ class ProjectParser:
     """Parser for Python project configuration files."""
 
     MUTUAL_SECTIONS = [
+        "name",
         "version",
         "license",
         "description",
@@ -335,7 +336,7 @@ class ProjectParser:
             "maintainers",
             "readme",
             "dependencies",
-            "requires_python",
+            "requires-python",
             "urls",
         ],
     }
@@ -373,7 +374,7 @@ class ProjectParser:
         content = setup_path.read_text(encoding="utf-8")
         return (
             Format.PYPROJECT
-            if content.strip() == legacy_setup_content
+            if content.strip() == legacy_setup_content.strip()
             else Format.SETUP
         )
 
@@ -497,6 +498,8 @@ def main(
 
     parser = ProjectParser(license_data)
     update_file = parser.detect_format(setup_path)
+    print(f"Detected format: {update_file.value}")
+
     sections = parser.parse(update_file, setup_path, pyproject_path)
     update_pyproject(pyproject_path, sections, authors)
     replace_setup(setup_path)

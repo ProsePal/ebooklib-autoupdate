@@ -5,6 +5,7 @@
 # ///
 import time
 import json
+from pathlib import Path
 
 import requests
 
@@ -32,9 +33,15 @@ def fetch_data(url: str, retry: int = 0) -> dict:
 
 
 def main() -> None:
+    file = Path(__file__).parent / "license-data.json"
     data = fetch_data(URL)
-    with open("licenses.json", "w") as f:
+    print(f"Downloaded {len(data)} licenses")
+    with file.open("w", encoding="utf-8") as f:
         json.dump(data, f)
+    if file.exists():
+        print(f"License data downloaded to {file.as_posix()}")
+    else:
+        exit(1, f"Failed to write license data to {file}")
 
 
 if __name__ == "__main__":
