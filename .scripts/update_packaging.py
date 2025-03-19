@@ -30,8 +30,8 @@ PyProject: TypeAlias = dict[str, Configuration]
 
 
 class Format(Enum):
-    SETUP = 1
-    PYPROJECT = 2
+    SETUP = "setup.py"
+    PYPROJECT = "pyproject.toml"
 
 
 @cache
@@ -500,6 +500,8 @@ def main(
 
     parser = ProjectParser(license_data)
     update_file = parser.detect_format(setup_path)
+    print(f"Detected format: {update_file.value}")
+
     sections = parser.parse(update_file, setup_path, pyproject_path)
     update_pyproject(pyproject_path, sections, authors)
     replace_setup(setup_path)
