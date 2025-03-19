@@ -136,9 +136,10 @@ def update_table_item(
         case "classifiers":
             value = update_classifiers(sections["classifiers"])
         case "dependencies":
-            value = update_dependencies(
-                sections.get(
-                    "dependencies",
+            value = (
+                update_dependencies("", sections.get("dependencies"))
+                if sections.get("dependencies")
+                else update_dependencies(
                     sections["install_requires"],
                     project["dependencies"],
                 )
@@ -328,14 +329,14 @@ class ProjectParser:
     ]
 
     FORMAT_SECTIONS = {
-        Format.SETUP_PY: [
+        Format.SETUP: [
             "author",
             "author_email",
             "long_description",
             "url",
             "install_requires",
         ],
-        Format.PYPROJECT_TOML: [
+        Format.PYPROJECT: [
             "authors",
             "maintainers",
             "readme",
@@ -398,7 +399,7 @@ class ProjectParser:
         """
         raw_config = (
             parse_ast(setup_path)
-            if config_format == Format.SETUP_PY
+            if config_format == Format.SETUP
             else parse_pyproject(pyproject_path)
         )
 
