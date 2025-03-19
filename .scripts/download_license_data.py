@@ -38,7 +38,9 @@ def main() -> None:
     print(f"Downloaded {len(data)} licenses")
     with file.open("w", encoding="utf-8") as f:
         json.dump(data, f)
-    if not file.exists():
+    if file.exists():
+        print(f"License data downloaded to {file.as_posix()}")
+    else:
         exit(1, f"Failed to write license data to {file}")
 
 
