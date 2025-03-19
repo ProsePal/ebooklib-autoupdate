@@ -169,6 +169,7 @@ def update_table_item(
             value = sections.get(
                 "urls", update_urls(project["urls"], sections["url"])
             )
+            sections.pop("url")
         case _:
             value = sections.get(item)
     if item in {"classifiers", "dependencies", "authors", "maintainers"}:
