@@ -33,7 +33,7 @@ def fetch_data(url: str, retry: int = 0) -> dict:
 
 
 def main() -> None:
-    file = Path(__file__).parent / "licenses.json"
+    file = Path(__file__).parent / "license-data.json"
     data = fetch_data(URL)
     print(f"Downloaded {len(data)} licenses")
     with file.open("w", encoding="utf-8") as f:
