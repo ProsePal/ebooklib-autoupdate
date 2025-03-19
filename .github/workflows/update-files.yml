@@ -75,10 +75,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: license-data
-          path: ./scripts/license-data.json
+          path: ./.scripts/license-data.json
 
       - name: Add license data to env
-        run: echo "LICENSE_DATA=$(pwd)/scripts/license-data.json" >> $GITHUB_ENV
+        run: echo "LICENSE_DATA=$(pwd)/.scripts/license-data.json" >> $GITHUB_ENV
 
       - name: Update packaging
         run: |
