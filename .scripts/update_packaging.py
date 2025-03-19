@@ -155,7 +155,7 @@ def update_table_item(
         case "maintainers":
             value = update_maintainers(sections)
         case "requires-python":
-            value = sections.get("requires_python", min_supported_py_version())
+            value = sections.get("requires-python", min_supported_py_version())
         case "urls":
             value = sections.get(
                 "urls", update_urls(project["urls"], sections["url"])
@@ -318,6 +318,7 @@ class ProjectParser:
     """Parser for Python project configuration files."""
 
     MUTUAL_SECTIONS = [
+        "name",
         "version",
         "license",
         "description",
@@ -338,7 +339,7 @@ class ProjectParser:
             "maintainers",
             "readme",
             "dependencies",
-            "requires_python",
+            "requires-python",
             "urls",
         ],
     }
