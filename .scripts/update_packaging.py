@@ -125,6 +125,9 @@ def update_urls(proj_urls: Table, home_url: str) -> Table:
     """Create a urls table from new homepage url and other existing urls"""
     urls = tomlkit.table()
     urls.add("Homepage", home_url)
+    if not proj_urls or proj_urls.value is None:
+        return urls
+
     for page, url in proj_urls.value.body:
         if page != "Homepage":
             urls.add(page, url)
@@ -247,7 +250,7 @@ def convert_license(license: str, license_data: dict) -> str:
     """
     try:
         spdx_id = next(find_license_id(license, license_data))
-        return "{text = %s}" % spdx_id
+        return '{text = "%s"}' % spdx_id
     except StopIteration as e:
         raise ValueError(f"License ID not found for '{license}'") from e
 
