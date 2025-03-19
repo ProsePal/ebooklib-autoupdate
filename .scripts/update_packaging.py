@@ -68,7 +68,7 @@ def create_inline_array(input_dict: dict[str, str]) -> Array:
     """Creates a tomlkit array on inline tables for authors/maintainers"""
     array = tomlkit.array()
     for name, email in input_dict.items():
-        inline_table = tomlkit.inline_table()
+        inline_table: tomlkit.items.InlineTable = tomlkit.inline_table()
         inline_table.update(
             {"name": name, "email": email} if email else {"name": name}
         )
@@ -102,13 +102,20 @@ def update_dependencies(
 
 
 def update_maintainers(
-    sections: dict[str, str | list[str]],
-    auto_maintainer: dict = FORK_MAINTAINER,
+    section_maintainers: dict[str, str],
+    project_maintainers: Array,
+    fork_maintainer: dict[str, str] = FORK_MAINTAINER,
 ) -> Array:
     """Creates a tomlkit inline array of project maintainers"""
+    if section_maintainers == project_maintainers:
+        if fork_maintainer not in project_maintainers:
+            maintainer = create_inline_array(fork_maintainer)
+            project_maintainers.extend(maintainer)
+        return project_maintainers
+
     maintainers = {
-        auto_maintainer["name"]: auto_maintainer["email"],
-        sections["maintainer"]: sections["maintainer_email"],
+        fork_maintainer["name"]: fork_maintainer["email"],
+        section_maintainers["name"]: section_maintainers["email"],
     }
     return create_inline_array(maintainers)
 
@@ -135,7 +142,7 @@ def update_urls(proj_urls: Table, home_url: str) -> Table:
 
 
 def update_table_item(
-    item: str, project: Table, sections: dict, authors: dict
+    item: str, project: Table, sections: PyProject, authors: dict[str, str]
 ) -> Table:
     """Returns the updated value for a project table item."""
     match item:
@@ -153,7 +160,9 @@ def update_table_item(
                 )
             )
         case "maintainers":
-            value = update_maintainers(sections)
+            value = update_maintainers(
+                sections["maintainers"], project["maintainers"]
+            )
         case "requires-python":
             value = sections.get("requires-python", min_supported_py_version())
         case "urls":
@@ -169,7 +178,7 @@ def update_table_item(
 
 def sort_project_table(
     doc: tomlkit.TOMLDocument,
-    sections: dict[str, str | list],
+    sections: PyProject,
     authors: dict[str, str],
 ) -> tomlkit.TOMLDocument:
     order = [
@@ -207,12 +216,12 @@ def sort_project_table(
 
 def update_pyproject(
     toml_path: Path,
-    sections: dict[str, str | list[str]],
+    sections: PyProject,
     authors: dict[str, str],
 ) -> None:
     """Updates pyproject.toml with new values."""
     with open(toml_path, "r", encoding="utf-8") as f:
-        doc = tomlkit.load(f)
+        doc: Table = tomlkit.load(f)
 
     updated_doc = sort_project_table(doc, sections, authors)
     toml_text = re.sub("\n{3,}", "\n\n", tomlkit.dumps(updated_doc))
@@ -307,11 +316,11 @@ def parse_ast(setup_path: Path) -> dict[str, str | list[str]]:
     return extract_setup_keywords(tree)
 
 
-def parse_pyproject(pyproject_path: Path) -> dict[str, str | list[str]]:
+def parse_pyproject(pyproject_path: Path) -> PyProject:
     """Parse the pyproject.toml file and return the project configuration."""
     with open(pyproject_path, "r", encoding="utf-8") as f:
         doc = tomlkit.load(f)
-    return doc["project"]
+    return doc["project"].unwrap()
 
 
 class ProjectParser:
@@ -440,7 +449,9 @@ class ProjectParser:
                 "license": convert_license(
                     sections["license"], self.license_data
                 ),
-                "maintainer": sections.pop("author"),
+                "maintainers": create_inline_array({
+                    sections["author"]: sections.pop("author")
+                }),
                 "maintainer_email": sections.pop("author_email"),
             }
 
