@@ -18,7 +18,7 @@ import tomlkit
 from tomlkit.items import Array, Table
 
 
-MIN_PY3_SUPPORTED_VERSION = 9
+MIN_PY3_SUPPORTED_VERSION = 6
 MAX_PY3_SUPPORTED_VERSION = 12
 
 FORK_MAINTAINER = {"name": "Ashlynn Antrobus", "email": "ashlynn@prosepal.io"}
@@ -68,6 +68,8 @@ def create_inline_array(input_dict: dict[str, str]) -> Array:
     """Creates a tomlkit array on inline tables for authors/maintainers"""
     array = tomlkit.array()
     for name, email in input_dict.items():
+        if not name:
+            continue
         inline_table: tomlkit.items.InlineTable = tomlkit.inline_table()
         inline_table.update(
             {"name": name, "email": email} if email else {"name": name}
@@ -102,7 +104,7 @@ def update_dependencies(
 
 
 def update_maintainers(
-    section_maintainers: dict[str, str],
+    section_maintainers: list[dict[str, str]],
     project_maintainers: Array,
     fork_maintainer: dict[str, str] = FORK_MAINTAINER,
 ) -> Array:
@@ -113,9 +115,10 @@ def update_maintainers(
             project_maintainers.extend(maintainer)
         return project_maintainers
 
+    section_maintainer = section_maintainers[0]
     maintainers = {
         fork_maintainer["name"]: fork_maintainer["email"],
-        section_maintainers["name"]: section_maintainers["email"],
+        section_maintainer["name"]: section_maintainer["email"],
     }
     return create_inline_array(maintainers)
 
@@ -140,7 +143,7 @@ def update_urls(proj_urls: Table, home_url: str) -> Table:
 
 def update_table_item(
     item: str, project: Table, sections: PyProject, authors: dict[str, str]
-) -> Table:
+) -> Configuration:
     """Returns the updated value for a project table item."""
     match item:
         case "authors":
@@ -163,10 +166,15 @@ def update_table_item(
         case "requires-python":
             value = sections.get("requires-python", min_supported_py_version())
         case "urls":
-            value = sections.get(
-                "urls", update_urls(project["urls"], sections["url"])
+            value = (
+                sections.get(
+                    "urls",
+                )
+                if sections.get("urls")
+                else update_urls(project.get("urls"), sections["url"])
             )
-            sections.pop("url")
+            if sections.get("url"):
+                sections.pop("url")
         case _:
             value = sections.get(item)
     if item in {"classifiers", "dependencies", "authors", "maintainers"}:
@@ -257,7 +265,9 @@ def convert_license(license: str, license_data: dict) -> str:
     """
     try:
         spdx_id = next(find_license_id(license, license_data))
-        return "{text = %s}" % spdx_id
+        license_table: tomlkit.items.InlineTable = tomlkit.inline_table()
+        license_table.update({"text": spdx_id})
+        return license_table
     except StopIteration as e:
         raise ValueError(f"License ID not found for '{license}'") from e
 
@@ -448,9 +458,8 @@ class ProjectParser:
                     sections["license"], self.license_data
                 ),
                 "maintainers": create_inline_array({
-                    sections["author"]: sections.pop("author")
+                    sections.pop("author"): sections.pop("author_email")
                 }),
-                "maintainer_email": sections.pop("author_email"),
             }
 
         return sections
