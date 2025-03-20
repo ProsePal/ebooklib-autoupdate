@@ -4,7 +4,6 @@ version = "0.18.2"
 description = "Ebook library which can handle EPUB2/EPUB3 format"
 readme = "README.md"
 requires-python = ">=3.6"
-license = { text = "AGPL-3.0" }
 keywords = ["ebook", "epub"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -58,16 +57,17 @@ authors = [
     {name = "Bono Lv", email = "lvscar@gmail.com"},
     {name = "Tom Ritchford", email = "tom@swirly.com"},
 ]
-
 dependencies = [
     "lxml>=4.9.0",
     "six>=1.16.0",
 ]
 
+[project.license]
+text = "AGPL-3.0"
+
 [project.urls]
 Homepage = "https://github.com/aerkalov/ebooklib"
-"Documentation" = "https://ebooklib.readthedocs.io"
-
+Documentation = "https://ebooklib.readthedocs.io"
 
 [build-system]
 requires = [
