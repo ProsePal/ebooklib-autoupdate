@@ -102,7 +102,6 @@ jobs:
 
       - name: Push changes
         run: |
-          git restore *
           if git log origin/master..HEAD | grep -q .; then
             git push origin master
           else
