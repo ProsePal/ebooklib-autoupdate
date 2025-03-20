@@ -85,6 +85,7 @@ jobs:
           uvx ruff format
           git add "${{ env.SETUP_FILE }}" "${{ env.PYPROJECT_FILE }}"
           git commit -m "Update supported Python versions"
+          del ${{ env.LICENSE_DATA }}
 
       - name: Update README
         run: |
