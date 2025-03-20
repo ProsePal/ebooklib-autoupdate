@@ -46,7 +46,9 @@ jobs:
           sed -i "0,/${{ steps.fork_state.outputs.current_version }}/s//${NEW_VERSION}/" ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }}
           sed -i "0,/${{ steps.fork_state.outputs.current_version }}/s//${NEW_VERSION}/" ${{ env.PYPROJECT_FILE }}
           git add ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }} ${{ env.PYPROJECT_FILE }}
-          git commit -m "Auto-increment version to $NEW_VERSION"
+          if git status --porcelain | grep -q -E "${{ env.VERSION_FILE }}|${{ env.SETUP_FILE }}|${{ env.PYPROJECT_FILE }}"; then
+            git commit -m "Auto-increment version to $NEW_VERSION"
+          fi
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -84,19 +86,28 @@ jobs:
           uv run .scripts/update_packaging.py "${{ env.SETUP_FILE }}" "${{ env.AUTHORS_FILE }}" "${{ env.PYPROJECT_FILE }}" "${{ env.LICENSE_DATA }}"
           uvx ruff format
           git add "${{ env.SETUP_FILE }}" "${{ env.PYPROJECT_FILE }}"
-          git commit -m "Update supported Python versions"
-          rm ${{ env.LICENSE_DATA }}
+          if git status --porcelain | grep -q -E "${{ env.SETUP_FILE }}|${{ env.PYPROJECT_FILE }}"; then
+            git commit -m "Update supported Python versions"
+          fi
+      - name: Remove license data
+        run: rm ${{ env.LICENSE_DATA }}
 
       - name: Update README
         run: |
           uv run .scripts/update_readme.py "${{ env.README_FILE }}"
           git add "${{ env.README_FILE }}"
-          git commit -m "Update README"
+          if git status --porcelain | grep -q "README.md"; then
+            git commit -m "Update README"
+          fi
 
       - name: Push changes
         run: |
           git restore *
-          git push origin master
+          if git log origin/master..HEAD | grep -q .; then
+            git push origin master
+          else
+            echo "No changes to push"
+          fi
 
 
       - name: Build and publish
