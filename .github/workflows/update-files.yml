@@ -93,7 +93,10 @@ jobs:
           git commit -m "Update README"
 
       - name: Push changes
-        run: git push origin master
+        run: |
+          git restore *
+          git push origin master
+
 
       - name: Build and publish
         run: |
