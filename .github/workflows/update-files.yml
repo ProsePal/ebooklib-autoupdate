@@ -20,7 +20,7 @@ env:
   README_FILE: README.md
 
 jobs:
-  process:
+  update-files:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

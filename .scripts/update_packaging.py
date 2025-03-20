@@ -135,6 +135,12 @@ def update_urls(proj_urls: Table, home_url: str) -> Table:
     """Create a urls table from new homepage url and other existing urls"""
     urls = tomlkit.table()
     urls.add("Homepage", home_url)
+<<<<<<< HEAD
+=======
+    if not proj_urls or proj_urls.value is None:
+        return urls
+
+>>>>>>> 6dcceb7df8ab3a4504f8c70f7d5ba3d050ff1653
     for page, url in proj_urls.value.body:
         if page != "Homepage":
             urls.add(page, url)
