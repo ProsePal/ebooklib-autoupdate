@@ -10,6 +10,12 @@ permissions:
 
 env:
   VERSION_FILE: VERSION.txt
+  SETUP_FILE: setup.py
+  AUTHORS_FILE: AUTHORS.txt
+  PYPROJECT_FILE: pyproject.toml
+  README_FILE: README.md
+  SPDX_DATA_URL: https://raw.githubusercontent.com/spdx/license-list-data/refs/heads/main/json/licenses.json
+
 
 jobs:
   update:
