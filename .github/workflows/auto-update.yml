@@ -62,7 +62,7 @@ jobs:
 
       - name: Update files
         if: steps.upstream_changes.outputs.updated_version == 'true'
-        uses: ./.github/workflows/update-files.yml
+        uses: ./.github/actions/update-files
         with:
           current_version: ${{ steps.fork_state.outputs.current_version }}
           

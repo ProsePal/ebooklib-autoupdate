@@ -35,7 +35,7 @@ jobs:
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
          
       - name: Update files
-        uses: ./.github/actions/update-files.yml
+        uses: ./.github/actions/update-files
         with:
           current_version: ${{ steps.version.outputs.current_version }}
 
