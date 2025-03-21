@@ -3,10 +3,9 @@ name: Update Files
 on:
   workflow_call:
     inputs:
-      updated_version:
+      current_version:
         required: true
-        type: boolean
-
+        type: string    
 
 permissions:
   contents: write
@@ -18,6 +17,7 @@ env:
   AUTHORS_FILE: AUTHORS.txt
   PYPROJECT_FILE: pyproject.toml
   README_FILE: README.md
+  SPDX_DATA_URL: https://raw.githubusercontent.com/spdx/license-list-data/refs/heads/main/json/licenses.json
 
 jobs:
   update-files:
@@ -31,24 +31,16 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Read current version
-        id: fork_state
-        run: |
-          CURRENT_VERSION=$(grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' "${{ env.VERSION_FILE }}")
-          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-
       - name: Increment version
         id: version
         run: |
-          IFS='.' read -r MAJOR MINOR PATCH <<< "${{ steps.fork_state.outputs.current_version }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${{ inputs.current_version }}"
           PATCH=$(($PATCH + 1))
           NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-          sed -i "0,/${{ steps.fork_state.outputs.current_version }}/s//${NEW_VERSION}/" ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }}
-          sed -i "0,/${{ steps.fork_state.outputs.current_version }}/s//${NEW_VERSION}/" ${{ env.PYPROJECT_FILE }}
+          sed -i "0,/${{ inputs.current_version }}/s//${NEW_VERSION}/" ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }}
+          sed -i "0,/${{ inputs.current_version }}/s//${NEW_VERSION}/" ${{ env.PYPROJECT_FILE }}
           git add ${{ env.VERSION_FILE }} ${{ env.SETUP_FILE }} ${{ env.PYPROJECT_FILE }}
-          if git status --porcelain | grep -q -E "${{ env.VERSION_FILE }}|${{ env.SETUP_FILE }}|${{ env.PYPROJECT_FILE }}"; then
-            git commit -m "Auto-increment version to $NEW_VERSION"
-          fi
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -69,7 +61,7 @@ jobs:
 
       - name: Download license data
         if: steps.license-cache.outputs.cache-hit != 'true'
-        run: uv run .scripts/download_license_data.py
+        run: uv run .scripts/download_license_data.py ${{ env.SPDX_DATA_URL }}
 
       - name: Cache license data
         if: steps.license-cache.outputs.cache-hit != 'true'
@@ -86,28 +78,26 @@ jobs:
           uv run .scripts/update_packaging.py "${{ env.SETUP_FILE }}" "${{ env.AUTHORS_FILE }}" "${{ env.PYPROJECT_FILE }}" "${{ env.LICENSE_DATA }}"
           uvx ruff format
           git add "${{ env.SETUP_FILE }}" "${{ env.PYPROJECT_FILE }}"
-          if git status --porcelain | grep -q -E "${{ env.SETUP_FILE }}|${{ env.PYPROJECT_FILE }}"; then
-            git commit -m "Update supported Python versions"
-          fi
+
       - name: Remove license data
-        run: rm ${{ env.LICENSE_DATA }}
+        run: |
+          if [ -f "${{ env.LICENSE_DATA }}" ]; then
+            rm "${{ env.LICENSE_DATA }}"
+          fi
 
       - name: Update README
         run: |
           uv run .scripts/update_readme.py "${{ env.README_FILE }}"
           git add "${{ env.README_FILE }}"
-          if git status --porcelain | grep -q "README.md"; then
-            git commit -m "Update README"
-          fi
 
       - name: Push changes
         run: |
-          if git log origin/master..HEAD | grep -q .; then
+          if git status --porcelain "${{ env.VERSION_FILE }}" "${{ env.SETUP_FILE }}" "${{ env.PYPROJECT_FILE }}" | grep -q .; then
+            git commit  -m "Auto-increment version to ${{ steps.version.outputs.new_version }}"
             git push origin master
           else
             echo "No changes to push"
           fi
-
 
       - name: Build and publish
         run: |

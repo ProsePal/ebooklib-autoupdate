@@ -9,8 +9,6 @@ from pathlib import Path
 
 import requests
 
-URL = "https://raw.githubusercontent.com/spdx/license-list-data/refs/heads/main/json/licenses.json"
-
 
 def download_file(url: str) -> dict:
     """Download file at url"""
@@ -32,9 +30,9 @@ def fetch_data(url: str, retry: int = 0) -> dict:
         return fetch_data(url, retry)
 
 
-def main() -> None:
+def main(url: str) -> None:
     file = Path(__file__).parent / "license-data.json"
-    data = fetch_data(URL)
+    data = fetch_data(url)
     print(f"Downloaded {len(data)} licenses")
     with file.open("w", encoding="utf-8") as f:
         json.dump(data, f)
@@ -45,4 +43,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    url = sys.argv[1]
+    main(url)

@@ -10,8 +10,40 @@ permissions:
   contents: write
   id-token: write
 
+env:
+  VERSION_FILE: VERSION.txt
+
 jobs:
-  update-files:
-    uses: ./.github/workflows/update-files.yml
-    with:
-      updated_version: true
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Read version number
+        id: version
+        run: |
+          CURRENT_VERSION=$(grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' "${{ env.VERSION_FILE }}")
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+         
+      - name: Update files
+        uses: ./.github/workflows/update-files.yml
+        with:
+          current_version: ${{ steps.version.outputs.current_version }}
+
+      - name: Set up Git user
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        
+      - name: Rebase commit history
+        run: |
+          git fetch origin
+          PREVIOUS_COMMIT=$(git log -2 --pretty=%H origin/master | tail -n 1)
+          UPDATE_FILES_COMMIT=$(git rev-parse HEAD)
+          git checkout "$PREVIOUS_COMMIT"
+          git cherry-pick "$UPDATE_FILES_COMMIT"
+          git commit --amend --no-edit
+          git push origin master --force

@@ -3,7 +3,6 @@ name: Auto-Update
 on:
   schedule:
     - cron: '0 0 * * 0'  # Every Sunday at midnight UTC
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -18,22 +17,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Add upstream repo
         run: |
           git remote add upstream https://github.com/aerkalov/ebooklib || echo "Upstream already added"
           git fetch upstream
 
-      - name: Read fork version
+      - name: Read current version
         id: fork_state
         run: |
           CURRENT_VERSION=$(grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' "${{ env.VERSION_FILE }}")
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Add GitHub Action Bot
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Check if upstream has changes
         id: upstream_changes
@@ -45,6 +41,11 @@ jobs:
             echo "updated_version=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Add GitHub Action Bot
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
       - name: Merge upstream changes
         if: steps.upstream_changes.outputs.updated_version == 'true'
         run: |
@@ -57,7 +58,18 @@ jobs:
         if: steps.upstream_changes.outputs.updated_version == 'true'
         uses: ./.github/workflows/update-files.yml
         with:
-          updated_version: ${{ steps.upstream_changes.outputs.updated_version }}
+          current_version: ${{ steps.fork_state.outputs.current_version }}
+          
+      - name: Rebase commit history
+        if: steps.upstream_changes.outputs.updated_version == 'true'
+        run: |
+          git fetch origin
+          MERGE_COMMIT=$(git log -2 --pretty=%H origin/master | tail -n 1)
+          UPDATE_FILES_COMMIT=$(git rev-parse HEAD)
+          git checkout "$MERGE_COMMIT"
+          git cherry-pick "$UPDATE_FILES_COMMIT"
+          git commit --amend --no-edit
+          git push origin master --force 
 
       - name: Sync new branches
         run: |
