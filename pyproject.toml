@@ -1,6 +1,6 @@
 [project]
 name = "ebooklib-autoupdate"
-version = "0.18.2"
+version = "0.18.1"
 description = "Ebook library which can handle EPUB2/EPUB3 format"
 readme = "README.md"
 requires-python = ">=3.6"
