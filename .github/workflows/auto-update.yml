@@ -58,7 +58,7 @@ jobs:
           {
             echo "${{ env.VERSION_FILE }} merge=theirs"
           } > .gitattributes
-          git merge upstream/master --no-edit
+          git merge upstream/master --allow-unrelated-histories
 
       - name: Update files
         if: steps.upstream_changes.outputs.updated_version == 'true'
