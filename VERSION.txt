@@ -1,1 +1,1 @@
-EbookLib 0.18.2
+EbookLib 0.18.3
